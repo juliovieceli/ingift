@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { selecionarTextoAoFocar } from '@/lib/selecionarAoFocar'
 import { useMutation } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { Botao } from '@/componentes/ui/Botao'
@@ -116,6 +117,7 @@ export function ModalCliente({ aberto, cliente, onFechar, onSalvo }: Props) {
           <textarea
             value={form.observacoes}
             onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
+            onFocus={selecionarTextoAoFocar}
             className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2"
             rows={2}
           />

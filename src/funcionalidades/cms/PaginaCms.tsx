@@ -19,6 +19,13 @@ function previewSecao(secao: SecaoLanding): string {
   if (slug === 'hero') {
     return [c.titulo, c.subtitulo].filter(Boolean).join(' — ')
   }
+  if (slug === 'contato') {
+    const redes = ['instagram', 'tiktok', 'youtube', 'shopee']
+      .map((k) => c[k])
+      .filter(Boolean)
+    const partes = [c.whatsapp && `WhatsApp: ${c.whatsapp}`, redes.length && `${redes.length} rede(s)`].filter(Boolean)
+    return partes.join(' · ') || 'Sem dados'
+  }
   const vals = Object.values(c).flat().filter(Boolean)
   return vals.length > 0 ? String(vals[0]) : ''
 }

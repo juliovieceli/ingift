@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { selecionarTextoAoFocar } from '@/lib/selecionarAoFocar'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { Botao } from '@/componentes/ui/Botao'
@@ -179,6 +180,7 @@ export function ModalMovimentacaoEstoque({ aberto, materialIdInicial, onFechar, 
           <textarea
             value={form.obs}
             onChange={(e) => setForm({ ...form, obs: e.target.value })}
+            onFocus={selecionarTextoAoFocar}
             className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2 text-[var(--texto)]"
             rows={2}
           />

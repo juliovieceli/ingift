@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
+import { selecionarTextoAoFocar } from '@/lib/selecionarAoFocar'
 import { useMutation } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { Botao } from '@/componentes/ui/Botao'
 import { Checkbox } from '@/componentes/ui/Checkbox'
 import { Input } from '@/componentes/ui/Input'
 import { Modal } from '@/componentes/ui/Modal'
+import { parseConteudo } from '@/lib/parseConteudo'
 import type { SecaoLanding } from '@/tipos/database'
+import { CamposContatoCms } from '@/funcionalidades/cms/CamposContatoCms'
+import { carregarCamposContato, montarConteudoContato } from '@/funcionalidades/cms/contatoCms'
 
 interface Props {
   aberto: boolean
@@ -38,30 +42,15 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
     whatsapp: '5511999999999',
     email: '',
     endereco: '',
+    instagram: '',
+    tiktok: '',
+    youtube: '',
+    shopee: '',
   },
 }
 
 function normalizarSlug(slug: string) {
   return slug === 'home' ? 'hero' : slug
-}
-
-function parseConteudo(raw: unknown): Record<string, unknown> {
-  if (raw == null) return {}
-  if (typeof raw === 'string') {
-    try {
-      const parsed = JSON.parse(raw) as unknown
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>
-      }
-    } catch {
-      return {}
-    }
-    return {}
-  }
-  if (typeof raw === 'object' && !Array.isArray(raw)) {
-    return raw as Record<string, unknown>
-  }
-  return {}
 }
 
 function carregarCampos(slug: string, conteudoRaw: unknown) {
@@ -84,11 +73,7 @@ function carregarCampos(slug: string, conteudoRaw: unknown) {
     return { texto: String(base.texto ?? '') }
   }
   if (slugNorm === 'contato') {
-    return {
-      whatsapp: String(base.whatsapp ?? ''),
-      email: String(base.email ?? ''),
-      endereco: String(base.endereco ?? ''),
-    }
+    return carregarCamposContato(conteudoRaw)
   }
   return Object.fromEntries(Object.entries(base).map(([k, v]) => [k, String(v ?? '')]))
 }
@@ -109,11 +94,7 @@ function montarConteudo(slug: string, campos: Record<string, string>): Record<st
     return { texto: campos.texto ?? '' }
   }
   if (slugNorm === 'contato') {
-    return {
-      whatsapp: campos.whatsapp ?? '',
-      email: campos.email ?? '',
-      endereco: campos.endereco ?? '',
-    }
+    return montarConteudoContato(campos)
   }
   return { ...campos }
 }
@@ -146,6 +127,7 @@ function CamposSecao({
         <textarea
           value={campos.itens ?? ''}
           onChange={(e) => atualizar('itens', e.target.value)}
+          onFocus={selecionarTextoAoFocar}
           className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2 text-[var(--texto)]"
           rows={5}
         />
@@ -160,6 +142,7 @@ function CamposSecao({
         <textarea
           value={campos.texto ?? ''}
           onChange={(e) => atualizar('texto', e.target.value)}
+          onFocus={selecionarTextoAoFocar}
           className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2 text-[var(--texto)]"
           rows={5}
         />
@@ -168,13 +151,7 @@ function CamposSecao({
   }
 
   if (slugNorm === 'contato') {
-    return (
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Input rotulo="WhatsApp (com DDI)" value={campos.whatsapp ?? ''} onChange={(e) => atualizar('whatsapp', e.target.value)} />
-        <Input rotulo="E-mail" type="email" value={campos.email ?? ''} onChange={(e) => atualizar('email', e.target.value)} />
-        <Input rotulo="Endereço" className="sm:col-span-2" value={campos.endereco ?? ''} onChange={(e) => atualizar('endereco', e.target.value)} />
-      </div>
-    )
+    return <CamposContatoCms campos={campos} atualizar={atualizar} />
   }
 
   return (

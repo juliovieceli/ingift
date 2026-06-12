@@ -1,5 +1,6 @@
 import { Link, Outlet } from 'react-router-dom'
 import { TemaToggle } from '@/componentes/TemaToggle'
+import { Rodape } from './Rodape'
 
 export function LayoutLanding() {
   return (
@@ -27,12 +28,7 @@ export function LayoutLanding() {
       <main className="flex-1">
         <Outlet />
       </main>
-      <footer className="border-t border-[var(--borda)] bg-primary-950 py-8 text-primary-100">
-        <div className="mx-auto max-w-6xl px-4 text-center text-sm">
-          <img src="/marca/logo.png" alt="InGift" className="mx-auto mb-4 h-12 w-auto" />
-          <p>© {new Date().getFullYear()} InGift — Impressão 3D</p>
-        </div>
-      </footer>
+      <Rodape />
     </div>
   )
 }

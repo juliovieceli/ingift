@@ -1,18 +1,20 @@
 import { useQuery } from '@tanstack/react-query'
+import { parseConteudo } from '@/lib/parseConteudo'
 import { buscarDadosLanding } from '@/lib/landingApi'
 import { portfolioFallback, secoesFallback } from './dadosFallback'
+import type { ContatoLanding } from './contatoLanding'
 import type { PortfolioItem, SecaoLanding } from '@/tipos/database'
 
 const agora = () => new Date().toISOString()
 
 function normalizarSecoes(
-  secoes: { slug: string; titulo: string; conteudo: SecaoLanding['conteudo']; ordem: number }[]
+  secoes: { slug: string; titulo: string; conteudo: SecaoLanding['conteudo']; ordem: number }[],
 ): SecaoLanding[] {
   return secoes.map((s) => ({
     id: s.slug,
     slug: s.slug,
     titulo: s.titulo,
-    conteudo: s.conteudo,
+    conteudo: parseConteudo(s.conteudo) as SecaoLanding['conteudo'],
     publicado: true,
     ordem: s.ordem,
     atualizadoEm: agora(),
@@ -21,7 +23,7 @@ function normalizarSecoes(
 }
 
 function normalizarPortfolio(
-  itens: { id: string; titulo: string; descricao: string | null; urlImagem: string; ordem: number }[]
+  itens: { id: string; titulo: string; descricao: string | null; urlImagem: string; ordem: number }[],
 ): PortfolioItem[] {
   const ts = agora()
   return itens.map((p) => ({
@@ -57,9 +59,16 @@ export function useLandingDados() {
 
   const secao = (slug: string) => landing.data?.secoes.find((s) => s.slug === slug)
 
+  const contato = (): ContatoLanding | undefined => {
+    const raw = secao('contato')?.conteudo
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+    return raw as ContatoLanding
+  }
+
   return {
     secoes: { data: landing.data?.secoes, isLoading: landing.isLoading },
     portfolio: { data: landing.data?.portfolio, isLoading: landing.isLoading },
     secao,
+    contato,
   }
 }

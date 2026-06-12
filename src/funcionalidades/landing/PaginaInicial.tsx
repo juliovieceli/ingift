@@ -1,16 +1,22 @@
 import { Botao } from '@/componentes/ui/Botao'
 import { useLandingDados } from './useLandingDados'
+import { linkWhatsapp } from './contatoLanding'
+import { LinksRedesSociais } from './LinksRedesSociais'
 
 export function PaginaInicial() {
-  const { secao, portfolio } = useLandingDados()
+  const { secao, portfolio, contato } = useLandingDados()
   const hero = secao('hero')?.conteudo as { titulo?: string; subtitulo?: string; cta?: string } | undefined
   const servicos = secao('servicos')?.conteudo as { itens?: string[] } | undefined
   const sobre = secao('sobre')?.conteudo as { texto?: string } | undefined
-  const contato = secao('contato')?.conteudo as { whatsapp?: string; email?: string; endereco?: string } | undefined
+  const dadosContato = contato()
 
-  const linkWhatsapp = contato?.whatsapp
-    ? `https://wa.me/${contato.whatsapp.replace(/\D/g, '')}`
-    : 'https://wa.me/5511999999999'
+  const whatsapp = linkWhatsapp(dadosContato?.whatsapp) ?? 'https://wa.me/5511999999999'
+  const temRedes = Boolean(
+    dadosContato?.instagram?.trim() ||
+    dadosContato?.tiktok?.trim() ||
+    dadosContato?.youtube?.trim() ||
+    dadosContato?.shopee?.trim()
+  )
 
   return (
     <>
@@ -24,7 +30,7 @@ export function PaginaInicial() {
               <p className="mt-4 text-lg text-primary-200">
                 {hero?.subtitulo ?? 'Transformamos suas ideias em objetos reais'}
               </p>
-              <a href={linkWhatsapp} target="_blank" rel="noreferrer" className="mt-8 inline-block">
+              <a href={whatsapp} target="_blank" rel="noreferrer" className="mt-8 inline-block">
                 <Botao variante="secundario">{hero?.cta ?? 'Solicitar orçamento'}</Botao>
               </a>
             </div>
@@ -83,16 +89,28 @@ export function PaginaInicial() {
       </section>
 
       <section id="contato" className="bg-primary-900 px-4 py-16 text-white">
-        <div className="mx-auto max-w-xl text-center">
-          <h2 className="text-3xl font-bold">Fale conosco</h2>
-          <p className="mt-4 text-primary-200">
-            Tire suas dúvidas ou solicite um orçamento pelo WhatsApp.
-          </p>
-          <a href={linkWhatsapp} target="_blank" rel="noreferrer" className="mt-8 inline-block">
-            <Botao variante="secundario">Chamar no WhatsApp</Botao>
-          </a>
-          {contato?.email && <p className="mt-4 text-sm text-primary-300">{contato.email}</p>}
-          {contato?.endereco && <p className="mt-2 text-sm text-primary-300">{contato.endereco}</p>}
+        <div className="mx-auto flex max-w-4xl flex-col items-center justify-center gap-10 md:flex-row md:items-start md:gap-16">
+          {temRedes && (
+            <div className="flex max-w-xs flex-col items-center text-center md:flex-1">
+              <h2 className="text-2xl font-bold">Siga-nos nas redes sociais</h2>
+              <p className="mt-3 text-sm text-primary-200">
+                Acompanhe nossos trabalhos e novidades.
+              </p>
+              <LinksRedesSociais contato={dadosContato} variante="claro" className="mt-6 justify-center" />
+            </div>
+          )}
+
+          <div className="flex max-w-xs flex-col items-center text-center md:flex-1">
+            <h2 className="text-2xl font-bold">Fale conosco</h2>
+            <p className="mt-3 text-sm text-primary-200">
+              Tire suas dúvidas ou solicite um orçamento pelo WhatsApp.
+            </p>
+            <a href={whatsapp} target="_blank" rel="noreferrer" className="mt-6 inline-block">
+              <Botao variante="secundario">Chamar no WhatsApp</Botao>
+            </a>
+            {dadosContato?.email && <p className="mt-4 text-sm text-primary-300">{dadosContato.email}</p>}
+            {dadosContato?.endereco && <p className="mt-2 text-sm text-primary-300">{dadosContato.endereco}</p>}
+          </div>
         </div>
       </section>
     </>

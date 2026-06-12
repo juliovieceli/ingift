@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react'
+import { selecionarTextoAoFocar } from '@/lib/selecionarAoFocar'
 import { Botao } from '@/componentes/ui/Botao'
 import { Input } from '@/componentes/ui/Input'
 import {
@@ -162,6 +163,7 @@ export function FormularioPecaOrcamento({
         <textarea
           value={peca.observacoes}
           onChange={(e) => onChange({ ...peca, observacoes: e.target.value })}
+          onFocus={selecionarTextoAoFocar}
           className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2"
           rows={2}
         />

@@ -1,4 +1,5 @@
 import { Search } from 'lucide-react'
+import { selecionarTextoAoFocar } from '@/lib/selecionarAoFocar'
 
 interface Props {
   valor: string
@@ -14,6 +15,7 @@ export function CampoPesquisa({ valor, onChange, placeholder = 'Pesquisar...' }:
         type="search"
         value={valor}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={selecionarTextoAoFocar}
         placeholder={placeholder}
         className="w-full rounded-lg border border-[var(--borda)] bg-[var(--superficie)] py-2 pl-9 pr-3 text-sm text-[var(--texto)] outline-none focus:border-secondary-500"
       />
