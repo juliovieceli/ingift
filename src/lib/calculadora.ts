@@ -6,10 +6,33 @@ export interface ConfigOperacional {
   margemMultiplicador: number
   taxaFalha: number
   taxaMarketplace: number
-  custoEmbalagem: number
-  custoFrete: number
-  custoAcabamento: number
-  outrosFixos: number
+}
+
+export type ConfigSnapshot = Pick<
+  ConfigOperacional,
+  'consumoKwh' | 'precoKwh' | 'valorMaquina' | 'vidaUtilHoras'
+>
+
+export interface ParamsMargemItem {
+  taxaFalha: number
+  margemMultiplicador: number
+  taxaMarketplace: number
+  adicional: number
+  desconto: number
+}
+
+export type TipoItemOrcamento = 'peca' | 'avulso'
+
+export interface ComposicaoLinha {
+  materialId: string
+  categoria: string
+  descricao?: string
+  tipo?: string
+  cor?: string
+  quantidade: number
+  unidadeMedida: string
+  custoUnitario: number
+  pesoG?: number
 }
 
 export interface FilamentoPeca {
@@ -17,14 +40,16 @@ export interface FilamentoPeca {
   cor: string
   precoPorKg: number
   pesoG: number
-  materialId?: string
+  materialId: string
 }
 
 export interface InsumoPeca {
-  materialId?: string
+  materialId: string
   nome: string
   quantidade: number
   custoUnitario: number
+  categoria?: string
+  unidadeMedida?: string
 }
 
 export interface PecaCalculo {
@@ -37,75 +62,283 @@ export interface PecaCalculo {
   insumos: InsumoPeca[]
 }
 
+export interface AvulsoCalculo {
+  nome: string
+  quantidade: number
+  custoUnitario: number
+  materialId?: string
+  aplicarMargem: boolean
+  observacoes?: string
+}
+
 export interface ResultadoPeca {
   pesoTotalG: number
+  quantidade: number
   custoMaterial: number
   custoEnergia: number
   custoDepreciacao: number
+  custoProducaoUnitario: number
+  custoProducaoTotal: number
+  custosFilamentos: { tipo: string; cor: string; custo: number }[]
+}
+
+export interface ResultadoPrecificacao {
+  custoAposFalha: number
+  precoComMargem: number
+  precoAntesTaxa: number
+  precoVenda: number
+  precoFinal: number
+  lucroEfetivo: number
+  margemEfetiva: number
   precoUnitario: number
   precoTotal: number
-  custosFilamentos: { tipo: string; cor: string; custo: number }[]
+}
+
+export interface ResultadoItemCompleto extends ResultadoPeca, ResultadoPrecificacao {}
+
+export interface TotaisOrcamento {
+  custoSubtotal: number
+  precoTotal: number
 }
 
 export function tempoHorasTotal(horas: number, minutos: number) {
   return horas + minutos / 60
 }
 
-export function calcularPeca(config: ConfigOperacional, peca: PecaCalculo): ResultadoPeca {
+export function custoMaterialFilamento(precoPorKg: number, pesoG: number) {
+  return (precoPorKg / 1000) * pesoG
+}
+
+export function custoComposicaoLinha(linha: ComposicaoLinha) {
+  if (linha.categoria === 'filamento' && linha.pesoG != null) {
+    return linha.custoUnitario * linha.pesoG
+  }
+  return linha.custoUnitario * linha.quantidade
+}
+
+export function pecaParaComposicao(peca: PecaCalculo): ComposicaoLinha[] {
+  const linhas: ComposicaoLinha[] = peca.filamentos.map((f) => ({
+    materialId: f.materialId,
+    categoria: 'filamento',
+    descricao: `${f.tipo} ${f.cor}`.trim(),
+    tipo: f.tipo,
+    cor: f.cor,
+    quantidade: f.pesoG,
+    unidadeMedida: 'gr',
+    custoUnitario: f.precoPorKg / 1000,
+    pesoG: f.pesoG,
+  }))
+  for (const ins of peca.insumos ?? []) {
+    linhas.push({
+      materialId: ins.materialId,
+      categoria: ins.categoria ?? 'insumo',
+      descricao: ins.nome,
+      tipo: ins.nome,
+      quantidade: ins.quantidade,
+      unidadeMedida: ins.unidadeMedida ?? 'un',
+      custoUnitario: ins.custoUnitario,
+    })
+  }
+  return linhas
+}
+
+export function composicaoParaPeca(
+  nomePeca: string,
+  tempoHoras: number,
+  tempoMinutos: number,
+  quantidade: number,
+  observacoes: string,
+  composicao: ComposicaoLinha[],
+): PecaCalculo {
+  const filamentos: FilamentoPeca[] = composicao
+    .filter((c) => c.categoria === 'filamento')
+    .map((c) => ({
+      materialId: c.materialId,
+      tipo: c.tipo ?? '',
+      cor: c.cor ?? '',
+      precoPorKg: c.custoUnitario * 1000,
+      pesoG: c.pesoG ?? c.quantidade,
+    }))
+  const insumos: InsumoPeca[] = composicao
+    .filter((c) => c.categoria !== 'filamento')
+    .map((c) => ({
+      materialId: c.materialId,
+      nome: c.descricao ?? c.tipo ?? '',
+      quantidade: c.quantidade,
+      custoUnitario: c.custoUnitario,
+      categoria: c.categoria,
+      unidadeMedida: c.unidadeMedida,
+    }))
+  return {
+    nomePeca,
+    tempoHoras,
+    tempoMinutos,
+    quantidade,
+    observacoes,
+    filamentos: filamentos.length > 0 ? filamentos : [],
+    insumos,
+  }
+}
+
+export function calcularCustosBrutosPeca(
+  config: ConfigSnapshot,
+  peca: PecaCalculo,
+): ResultadoPeca {
   const tempo = tempoHorasTotal(peca.tempoHoras, peca.tempoMinutos)
+  const quantidade = Math.max(1, peca.quantidade || 1)
+
   const custosFilamentos = peca.filamentos.map((f) => ({
     tipo: f.tipo,
     cor: f.cor,
-    custo: (f.pesoG / 1000) * f.precoPorKg,
+    custo: custoMaterialFilamento(f.precoPorKg, f.pesoG),
   }))
   const custoFilamentos = custosFilamentos.reduce((s, f) => s + f.custo, 0)
   const custoInsumos = (peca.insumos ?? []).reduce((s, i) => s + i.quantidade * i.custoUnitario, 0)
   const custoMaterial = custoFilamentos + custoInsumos
-  const custoEnergia = tempo * config.consumoKwh * config.precoKwh
-  const custoDepreciacao = tempo * (config.valorMaquina / config.vidaUtilHoras)
-  const subtotalCustos = custoMaterial + custoEnergia + custoDepreciacao
-  const subtotalComFalha = subtotalCustos * (1 + config.taxaFalha)
-  const subtotalComMarketplace = subtotalComFalha * (1 + config.taxaMarketplace)
-  const precoUnitario =
-    subtotalComMarketplace * config.margemMultiplicador +
-    config.custoEmbalagem +
-    config.custoFrete +
-    config.custoAcabamento +
-    config.outrosFixos
+  const custoEnergia = config.consumoKwh * config.precoKwh * tempo
+  const custoDepreciacao =
+    config.vidaUtilHoras > 0 ? (config.valorMaquina / config.vidaUtilHoras) * tempo : 0
+  const custoProducaoUnitario = custoMaterial + custoEnergia + custoDepreciacao
+  const custoProducaoTotal = custoProducaoUnitario * quantidade
   const pesoTotalG = peca.filamentos.reduce((s, f) => s + f.pesoG, 0)
 
   return {
     pesoTotalG,
+    quantidade,
     custoMaterial,
     custoEnergia,
     custoDepreciacao,
-    precoUnitario,
-    precoTotal: precoUnitario * peca.quantidade,
+    custoProducaoUnitario,
+    custoProducaoTotal,
     custosFilamentos,
   }
 }
 
-export interface PecaSessao {
-  id: string
-  peca: PecaCalculo
-  resultado: ResultadoPeca
+/** @deprecated use calcularCustosBrutosPeca */
+export function calcularPeca(config: ConfigSnapshot, peca: PecaCalculo): ResultadoPeca {
+  return calcularCustosBrutosPeca(config, peca)
 }
 
-export function agregarResultados(pecas: ResultadoPeca[]) {
-  return pecas.reduce(
-    (acc, r) => ({
-      custoMaterial: acc.custoMaterial + r.custoMaterial,
-      custoEnergia: acc.custoEnergia + r.custoEnergia,
-      custoDepreciacao: acc.custoDepreciacao + r.custoDepreciacao,
-      precoTotal: acc.precoTotal + r.precoTotal,
-      pesoTotalG: acc.pesoTotalG + r.pesoTotalG,
-    }),
-    { custoMaterial: 0, custoEnergia: 0, custoDepreciacao: 0, precoTotal: 0, pesoTotalG: 0 }
-  )
+export function aplicarPrecificacaoItem(
+  custoProducaoTotal: number,
+  quantidade: number,
+  opts: {
+    tipoItem: TipoItemOrcamento
+    aplicarMargem: boolean
+  } & ParamsMargemItem,
+): ResultadoPrecificacao {
+  const qtd = Math.max(1, quantidade || 1)
+
+  if (!opts.aplicarMargem) {
+    const precoFinal = custoProducaoTotal
+    return {
+      custoAposFalha: custoProducaoTotal,
+      precoComMargem: custoProducaoTotal,
+      precoAntesTaxa: custoProducaoTotal,
+      precoVenda: custoProducaoTotal,
+      precoFinal,
+      lucroEfetivo: 0,
+      margemEfetiva: 0,
+      precoUnitario: precoFinal / qtd,
+      precoTotal: precoFinal,
+    }
+  }
+
+  const custoAposFalha =
+    opts.tipoItem === 'peca'
+      ? custoProducaoTotal * (1 + (opts.taxaFalha || 0))
+      : custoProducaoTotal
+
+  const precoComMargem = custoAposFalha * (opts.margemMultiplicador || 1)
+  const precoAntesTaxa = precoComMargem + (opts.adicional || 0)
+  const taxa = Math.min(Math.max(opts.taxaMarketplace || 0, 0), 0.95)
+  const precoVenda = taxa > 0 ? precoAntesTaxa / (1 - taxa) : precoAntesTaxa
+  const precoFinal = Math.max(0, precoVenda - (opts.desconto || 0))
+  const lucroEfetivo = precoFinal - custoProducaoTotal
+  const margemEfetiva = custoProducaoTotal > 0 ? lucroEfetivo / custoProducaoTotal : 0
+
+  return {
+    custoAposFalha,
+    precoComMargem,
+    precoAntesTaxa,
+    precoVenda,
+    precoFinal,
+    lucroEfetivo,
+    margemEfetiva,
+    precoUnitario: precoFinal / qtd,
+    precoTotal: precoFinal,
+  }
+}
+
+export function calcularItemPeca(
+  config: ConfigSnapshot,
+  peca: PecaCalculo,
+  params: ParamsMargemItem,
+): ResultadoItemCompleto {
+  const brutos = calcularCustosBrutosPeca(config, peca)
+  const precificacao = aplicarPrecificacaoItem(brutos.custoProducaoTotal, brutos.quantidade, {
+    tipoItem: 'peca',
+    aplicarMargem: true,
+    ...params,
+  })
+  return { ...brutos, ...precificacao }
+}
+
+export function calcularCustoAvulso(avulso: AvulsoCalculo) {
+  const qtd = Math.max(1, avulso.quantidade || 1)
+  return qtd * (avulso.custoUnitario || 0)
+}
+
+export function calcularItemAvulso(
+  avulso: AvulsoCalculo,
+  params: ParamsMargemItem,
+): ResultadoPrecificacao & { custoProducaoTotal: number; quantidade: number } {
+  const quantidade = Math.max(1, avulso.quantidade || 1)
+  const custoProducaoTotal = calcularCustoAvulso(avulso)
+  const precificacao = aplicarPrecificacaoItem(custoProducaoTotal, quantidade, {
+    tipoItem: 'avulso',
+    aplicarMargem: avulso.aplicarMargem,
+    ...params,
+  })
+  return { custoProducaoTotal, quantidade, ...precificacao }
+}
+
+export function calcularTotaisOrcamento(
+  itens: { custoProducaoTotal: number; precoFinal: number }[],
+): TotaisOrcamento {
+  return {
+    custoSubtotal: itens.reduce((s, i) => s + i.custoProducaoTotal, 0),
+    precoTotal: itens.reduce((s, i) => s + i.precoFinal, 0),
+  }
+}
+
+export function paramsMargemDeConfig(config: ConfigOperacional): ParamsMargemItem {
+  return {
+    taxaFalha: config.taxaFalha,
+    margemMultiplicador: config.margemMultiplicador,
+    taxaMarketplace: config.taxaMarketplace,
+    adicional: 0,
+    desconto: 0,
+  }
+}
+
+export function configSnapshotDeConfig(config: ConfigOperacional): ConfigSnapshot {
+  return {
+    consumoKwh: config.consumoKwh,
+    precoKwh: config.precoKwh,
+    valorMaquina: config.valorMaquina,
+    vidaUtilHoras: config.vidaUtilHoras,
+  }
 }
 
 export function formatarMoeda(valor: number) {
-  return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const n = Number(valor)
+  if (!Number.isFinite(n)) return 'R$ 0,00'
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+export function formatarPercentual(valor: number) {
+  return `${(valor * 100).toFixed(1)}%`
 }
 
 export function configOperacionalPadrao(): ConfigOperacional {
@@ -117,10 +350,6 @@ export function configOperacionalPadrao(): ConfigOperacional {
     margemMultiplicador: 2.5,
     taxaFalha: 0.15,
     taxaMarketplace: 0,
-    custoEmbalagem: 0,
-    custoFrete: 0,
-    custoAcabamento: 0,
-    outrosFixos: 0,
   }
 }
 
@@ -132,10 +361,6 @@ export function configDeImpressora(c: {
   margemMultiplicador: number | string
   taxaFalha: number | string
   taxaMarketplace: number | string
-  custoEmbalagem: number | string
-  custoFrete: number | string
-  custoAcabamento: number | string
-  outrosFixos: number | string
 }): ConfigOperacional {
   return {
     consumoKwh: Number(c.consumoKwh),
@@ -145,33 +370,20 @@ export function configDeImpressora(c: {
     margemMultiplicador: Number(c.margemMultiplicador),
     taxaFalha: Number(c.taxaFalha),
     taxaMarketplace: Number(c.taxaMarketplace),
-    custoEmbalagem: Number(c.custoEmbalagem),
-    custoFrete: Number(c.custoFrete),
-    custoAcabamento: Number(c.custoAcabamento),
-    outrosFixos: Number(c.outrosFixos),
   }
 }
 
-export function configDeDadosCalculo(d: {
-  dadosImpressora?: Record<string, number>
-  dadosMargensTaxas?: Record<string, number>
-  dadosLogistica?: Record<string, number>
-}): ConfigOperacional {
-  const padrao = configOperacionalPadrao()
-  const imp = d.dadosImpressora ?? {}
-  const marg = d.dadosMargensTaxas ?? {}
-  const log = d.dadosLogistica ?? {}
+export function avulsoVazio(): AvulsoCalculo {
   return {
-    consumoKwh: imp.consumoKwh ?? padrao.consumoKwh,
-    precoKwh: imp.precoKwh ?? padrao.precoKwh,
-    valorMaquina: imp.valorMaquina ?? padrao.valorMaquina,
-    vidaUtilHoras: imp.vidaUtilHoras ?? padrao.vidaUtilHoras,
-    margemMultiplicador: marg.margemMultiplicador ?? padrao.margemMultiplicador,
-    taxaFalha: marg.taxaFalha ?? padrao.taxaFalha,
-    taxaMarketplace: marg.taxaMarketplace ?? padrao.taxaMarketplace,
-    custoEmbalagem: log.custoEmbalagem ?? padrao.custoEmbalagem,
-    custoFrete: log.custoFrete ?? padrao.custoFrete,
-    custoAcabamento: log.custoAcabamento ?? padrao.custoAcabamento,
-    outrosFixos: log.outrosFixos ?? padrao.outrosFixos,
+    nome: '',
+    quantidade: 1,
+    custoUnitario: 0,
+    aplicarMargem: true,
+    observacoes: '',
   }
+}
+
+export function paramsMargemVazio(): ParamsMargemItem {
+  const padrao = configOperacionalPadrao()
+  return paramsMargemDeConfig(padrao)
 }

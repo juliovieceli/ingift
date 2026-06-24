@@ -1,107 +1,346 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export async function recalcularTotaisOrcamento(
+import {
+  calcularItemAvulso,
+  calcularItemPeca,
+  calcularTotaisOrcamento,
+  composicaoParaPeca,
+  configDeImpressora,
+  configSnapshotDeConfig,
+  paramsMargemDeConfig,
+  pecaParaComposicao,
+  type AvulsoCalculo,
+  type ComposicaoLinha,
+  type ConfigOperacional,
+  type ParamsMargemItem,
+  type PecaCalculo,
+  type ResultadoItemCompleto,
+} from '@/lib/calculadora'
+import type { OrcamentoItem, OrcamentoItemComposicao } from '@/tipos/database'
+
+export type OrcamentoItemComComposicao = OrcamentoItem & {
+  OrcamentoItemComposicao?: OrcamentoItemComposicao[]
+}
+
+export type SalvarItemPecaInput = {
+  peca: PecaCalculo
+  config: ConfigOperacional
+  params?: Partial<ParamsMargemItem>
+}
+
+export type SalvarItemAvulsoInput = {
+  avulso: AvulsoCalculo
+  config: ConfigOperacional
+  params?: Partial<ParamsMargemItem>
+}
+
+function mergeParams(config: ConfigOperacional, extra?: Partial<ParamsMargemItem>): ParamsMargemItem {
+  return { ...paramsMargemDeConfig(config), ...extra }
+}
+
+function snapshotDeConfig(config: ConfigOperacional) {
+  return {
+    ...configSnapshotDeConfig(config),
+    taxaFalha: config.taxaFalha,
+    margemMultiplicador: config.margemMultiplicador,
+    taxaMarketplace: config.taxaMarketplace,
+  }
+}
+
+export function itemParaPeca(item: OrcamentoItemComComposicao): {
+  peca: PecaCalculo
+  composicao: ComposicaoLinha[]
+  params: ParamsMargemItem
+} {
+  const comp = [...(item.OrcamentoItemComposicao ?? [])].sort((a, b) => a.ordem - b.ordem)
+  const composicao: ComposicaoLinha[] = comp.map((c) => ({
+    materialId: c.materialId,
+    categoria: c.categoria,
+    descricao: c.descricao ?? undefined,
+    tipo: c.tipo ?? undefined,
+    cor: c.cor ?? undefined,
+    quantidade: Number(c.quantidade),
+    unidadeMedida: c.unidadeMedida,
+    custoUnitario: Number(c.custoUnitario),
+    pesoG: c.pesoG != null ? Number(c.pesoG) : undefined,
+  }))
+
+  const peca = composicaoParaPeca(
+    item.nomePeca,
+    item.tempoHoras,
+    item.tempoMinutos,
+    item.quantidade,
+    item.observacoes ?? '',
+    composicao,
+  )
+
+  const params: ParamsMargemItem = {
+    taxaFalha: Number(item.taxaFalha),
+    margemMultiplicador: Number(item.margemMultiplicador),
+    taxaMarketplace: Number(item.taxaMarketplace),
+    adicional: Number(item.adicional),
+    desconto: Number(item.desconto),
+  }
+
+  return { peca, composicao, params }
+}
+
+export function itemParaAvulso(item: OrcamentoItemComComposicao): AvulsoCalculo {
+  const qtd = Number(item.quantidade)
+  return {
+    nome: item.nomePeca,
+    quantidade: qtd,
+    custoUnitario: Number(item.custoUnitario) || (qtd > 0 ? Number(item.custoMaterial) / qtd : 0),
+    materialId: item.materialId ?? undefined,
+    aplicarMargem: item.aplicarMargem ?? true,
+    observacoes: item.observacoes ?? '',
+  }
+}
+
+async function salvarComposicaoItem(
   supabase: SupabaseClient,
-  orcamentoId: string,
+  itemId: string,
+  composicao: ComposicaoLinha[],
 ) {
+  await supabase.from('OrcamentoItemComposicao').delete().eq('itemOrcamentoId', itemId)
+  for (const [ordem, linha] of composicao.entries()) {
+    const custoTotal = linha.categoria === 'filamento' && linha.pesoG != null
+      ? linha.custoUnitario * linha.pesoG
+      : linha.custoUnitario * linha.quantidade
+    const { error } = await supabase.from('OrcamentoItemComposicao').insert({
+      itemOrcamentoId: itemId,
+      materialId: linha.materialId,
+      categoria: linha.categoria,
+      descricao: linha.descricao ?? linha.tipo ?? null,
+      tipo: linha.tipo ?? null,
+      cor: linha.cor ?? null,
+      quantidade: linha.quantidade,
+      unidadeMedida: linha.unidadeMedida,
+      custoUnitario: linha.custoUnitario,
+      custoTotal,
+      pesoG: linha.pesoG ?? null,
+      ordem,
+    })
+    if (error) throw error
+  }
+}
+
+function rowItemPeca(
+  orcamentoId: string,
+  peca: PecaCalculo,
+  resultado: ResultadoItemCompleto,
+  config: ConfigOperacional,
+  params: ParamsMargemItem,
+  ordem: number,
+) {
+  return {
+    orcamentoId,
+    tipoItem: 'peca',
+    aplicarMargem: true,
+    nomePeca: peca.nomePeca,
+    tempoHoras: peca.tempoHoras,
+    tempoMinutos: peca.tempoMinutos,
+    quantidade: peca.quantidade,
+    pesoTotalG: resultado.pesoTotalG,
+    observacoes: peca.observacoes || null,
+    materialId: null,
+    custoUnitario: 0,
+    custoMaterial: resultado.custoMaterial,
+    custoEnergia: resultado.custoEnergia,
+    custoDepreciacao: resultado.custoDepreciacao,
+    custoProducaoTotal: resultado.custoProducaoTotal,
+    precoUnitario: resultado.precoUnitario,
+    precoTotal: resultado.precoFinal,
+    precoVenda: resultado.precoVenda,
+    precoFinal: resultado.precoFinal,
+    lucroEfetivo: resultado.lucroEfetivo,
+    margemEfetiva: resultado.margemEfetiva,
+    custoAposFalha: resultado.custoAposFalha,
+    ...snapshotDeConfig(config),
+    taxaFalha: params.taxaFalha,
+    margemMultiplicador: params.margemMultiplicador,
+    taxaMarketplace: params.taxaMarketplace,
+    adicional: params.adicional,
+    desconto: params.desconto,
+    ordem,
+  }
+}
+
+function rowItemAvulso(
+  orcamentoId: string,
+  avulso: AvulsoCalculo,
+  resultado: ReturnType<typeof calcularItemAvulso>,
+  config: ConfigOperacional,
+  params: ParamsMargemItem,
+  ordem: number,
+) {
+  return {
+    orcamentoId,
+    tipoItem: 'avulso',
+    aplicarMargem: avulso.aplicarMargem,
+    nomePeca: avulso.nome,
+    tempoHoras: 0,
+    tempoMinutos: 0,
+    quantidade: avulso.quantidade,
+    pesoTotalG: 0,
+    observacoes: avulso.observacoes || null,
+    materialId: avulso.materialId ?? null,
+    custoUnitario: avulso.custoUnitario,
+    custoMaterial: resultado.custoProducaoTotal,
+    custoEnergia: 0,
+    custoDepreciacao: 0,
+    custoProducaoTotal: resultado.custoProducaoTotal,
+    precoUnitario: resultado.precoUnitario,
+    precoTotal: resultado.precoFinal,
+    precoVenda: resultado.precoVenda,
+    precoFinal: resultado.precoFinal,
+    lucroEfetivo: resultado.lucroEfetivo,
+    margemEfetiva: resultado.margemEfetiva,
+    custoAposFalha: resultado.custoAposFalha,
+    ...snapshotDeConfig(config),
+    taxaFalha: params.taxaFalha,
+    margemMultiplicador: params.margemMultiplicador,
+    taxaMarketplace: params.taxaMarketplace,
+    adicional: params.adicional,
+    desconto: params.desconto,
+    ordem,
+  }
+}
+
+export async function recalcularTotaisOrcamento(supabase: SupabaseClient, orcamentoId: string) {
   const { data: itens } = await supabase
     .from('OrcamentoItem')
-    .select('custoMaterial, custoEnergia, custoDepreciacao, precoTotal')
+    .select('custoProducaoTotal, precoFinal, precoTotal')
     .eq('orcamentoId', orcamentoId)
 
   const lista = itens ?? []
-  const custoSubtotal = lista.reduce(
-    (s, i) => s + Number(i.custoMaterial) + Number(i.custoEnergia) + Number(i.custoDepreciacao),
-    0,
+  const totais = calcularTotaisOrcamento(
+    lista.map((i) => ({
+      custoProducaoTotal: Number(i.custoProducaoTotal) || 0,
+      precoFinal: Number(i.precoFinal ?? i.precoTotal) || 0,
+    })),
   )
-  const precoTotal = lista.reduce((s, i) => s + Number(i.precoTotal), 0)
 
   await supabase
     .from('Orcamento')
-    .update({ custoSubtotal, precoTotal })
+    .update({ custoSubtotal: totais.custoSubtotal, precoTotal: totais.precoTotal })
     .eq('id', orcamentoId)
 
-  return { custoSubtotal, precoTotal }
+  return totais
 }
 
 export async function salvarOrcamentoItem(
   supabase: SupabaseClient,
   orcamentoId: string,
-  peca: import('@/lib/calculadora').PecaCalculo,
-  resultado: import('@/lib/calculadora').ResultadoPeca,
+  input: SalvarItemPecaInput,
   ordem: number,
+  recalcular = true,
 ) {
+  const params = mergeParams(input.config, input.params)
+  const resultado = calcularItemPeca(configSnapshotDeConfig(input.config), input.peca, params)
+  const composicao = pecaParaComposicao(input.peca)
+
   const { data: item, error: errItem } = await supabase
     .from('OrcamentoItem')
-    .insert({
-      orcamentoId,
-      nomePeca: peca.nomePeca,
-      tempoHoras: peca.tempoHoras,
-      tempoMinutos: peca.tempoMinutos,
-      quantidade: peca.quantidade,
-      pesoTotalG: resultado.pesoTotalG,
-      observacoes: peca.observacoes || null,
-      custoMaterial: resultado.custoMaterial,
-      custoEnergia: resultado.custoEnergia,
-      custoDepreciacao: resultado.custoDepreciacao,
-      precoUnitario: resultado.precoUnitario,
-      precoTotal: resultado.precoTotal,
-      detalheCustos: resultado,
-      ordem,
-    })
+    .insert(rowItemPeca(orcamentoId, input.peca, resultado, input.config, params, ordem))
     .select('id')
     .single()
 
   if (errItem || !item) throw errItem ?? new Error('Falha ao criar item')
 
-  const itemId = (item as { id: string }).id
+  await salvarComposicaoItem(supabase, item.id, composicao)
 
-  for (const [idx, fil] of peca.filamentos.entries()) {
-    const custo = resultado.custosFilamentos[idx]?.custo ?? 0
-    await supabase.from('OrcamentoItemFilamento').insert({
-      itemOrcamentoId: itemId,
-      filamentoId: fil.materialId || null,
-      tipo: fil.tipo,
-      cor: fil.cor || null,
-      precoPorKg: fil.precoPorKg,
-      pesoG: fil.pesoG,
-      custoUnitario: custo,
-      ordem: idx,
-    })
-    if (fil.materialId) {
-      try {
-        await supabase.from('OrcamentoItemMaterial').insert({
-          itemOrcamentoId: itemId,
-          materialId: fil.materialId,
-          tipo: fil.tipo,
-          cor: fil.cor || null,
-          quantidade: fil.pesoG,
-          precoUnitario: fil.precoPorKg / 1000,
-          custoUnitario: custo,
-          ordem: idx,
-        })
-      } catch {
-        /* tabela pode não existir antes da migration */
-      }
-    }
-  }
+  if (recalcular) await recalcularTotaisOrcamento(supabase, orcamentoId)
+}
 
-  for (const [idx, ins] of (peca.insumos ?? []).entries()) {
-    if (!ins.materialId) continue
-    try {
-      await supabase.from('OrcamentoItemMaterial').insert({
-        itemOrcamentoId: itemId,
-        materialId: ins.materialId,
-        tipo: ins.nome,
-        quantidade: ins.quantidade,
-        precoUnitario: ins.custoUnitario,
-        custoUnitario: ins.quantidade * ins.custoUnitario,
-        ordem: peca.filamentos.length + idx,
-      })
-    } catch {
-      /* tabela pode não existir antes da migration */
-    }
-  }
+export async function salvarItemAvulso(
+  supabase: SupabaseClient,
+  orcamentoId: string,
+  input: SalvarItemAvulsoInput,
+  ordem: number,
+  recalcular = true,
+) {
+  const params = mergeParams(input.config, input.params)
+  const resultado = calcularItemAvulso(input.avulso, params)
+
+  const { error: errItem } = await supabase
+    .from('OrcamentoItem')
+    .insert(rowItemAvulso(orcamentoId, input.avulso, resultado, input.config, params, ordem))
+
+  if (errItem) throw errItem
+
+  if (recalcular) await recalcularTotaisOrcamento(supabase, orcamentoId)
+}
+
+export async function atualizarOrcamentoItem(
+  supabase: SupabaseClient,
+  orcamentoId: string,
+  itemId: string,
+  input: SalvarItemPecaInput,
+) {
+  const params = mergeParams(input.config, input.params)
+  const resultado = calcularItemPeca(configSnapshotDeConfig(input.config), input.peca, params)
+  const composicao = pecaParaComposicao(input.peca)
+
+  const { error: errItem } = await supabase
+    .from('OrcamentoItem')
+    .update(rowItemPeca(orcamentoId, input.peca, resultado, input.config, params, 0))
+    .eq('id', itemId)
+
+  if (errItem) throw errItem
+
+  await salvarComposicaoItem(supabase, itemId, composicao)
+  await recalcularTotaisOrcamento(supabase, orcamentoId)
+}
+
+export async function atualizarItemAvulso(
+  supabase: SupabaseClient,
+  orcamentoId: string,
+  itemId: string,
+  input: SalvarItemAvulsoInput,
+) {
+  const params = mergeParams(input.config, input.params)
+  const resultado = calcularItemAvulso(input.avulso, params)
+
+  const { error: errItem } = await supabase
+    .from('OrcamentoItem')
+    .update(rowItemAvulso(orcamentoId, input.avulso, resultado, input.config, params, 0))
+    .eq('id', itemId)
+
+  if (errItem) throw errItem
 
   await recalcularTotaisOrcamento(supabase, orcamentoId)
 }
+
+export async function criarOrcamentoVazio(
+  supabase: SupabaseClient,
+  clienteId: string,
+  opts?: { configuracaoImpressoraId?: string | null; validoAte?: string | null; prazoEntrega?: string | null },
+) {
+  const { data: status } = await supabase
+    .from('OrcamentoStatus')
+    .select('id')
+    .eq('codigo', 'em_digitacao')
+    .single()
+  if (!status) throw new Error('Status em_digitacao não encontrado')
+
+  const { data, error } = await supabase
+    .from('Orcamento')
+    .insert({
+      clienteId,
+      statusOrcamentoId: status.id,
+      configuracaoImpressoraId: opts?.configuracaoImpressoraId ?? null,
+      validoAte: opts?.validoAte ?? null,
+      prazoEntrega: opts?.prazoEntrega ?? null,
+      origem: 'manual',
+      custoSubtotal: 0,
+      precoTotal: 0,
+    })
+    .select('id')
+    .single()
+
+  if (error || !data) throw error ?? new Error('Falha ao criar orçamento')
+  return data.id
+}
+
+export { configDeImpressora }

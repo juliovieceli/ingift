@@ -65,10 +65,6 @@ export function ModalConfigSistema({ aberto, config, onFechar, onSalvo }: Props)
           <Input rotulo="Margem" type="number" step="0.1" value={form.templateMargemMultiplicador} onChange={(e) => num('templateMargemMultiplicador', e.target.value)} />
           <Input rotulo="Taxa falha" type="number" step="0.01" value={form.templateTaxaFalha} onChange={(e) => num('templateTaxaFalha', e.target.value)} />
           <Input rotulo="Taxa marketplace" type="number" step="0.01" value={form.templateTaxaMarketplace} onChange={(e) => num('templateTaxaMarketplace', e.target.value)} />
-          <Input rotulo="Embalagem (R$)" type="number" step="0.01" value={form.templateCustoEmbalagem} onChange={(e) => num('templateCustoEmbalagem', e.target.value)} />
-          <Input rotulo="Frete (R$)" type="number" step="0.01" value={form.templateCustoFrete} onChange={(e) => num('templateCustoFrete', e.target.value)} />
-          <Input rotulo="Acabamento (R$)" type="number" step="0.01" value={form.templateCustoAcabamento} onChange={(e) => num('templateCustoAcabamento', e.target.value)} />
-          <Input rotulo="Outros fixos (R$)" type="number" step="0.01" value={form.templateOutrosFixos} onChange={(e) => num('templateOutrosFixos', e.target.value)} />
         </div>
         {erro && <p className="text-sm text-erro">{erro}</p>}
         <div className="flex justify-end gap-2">

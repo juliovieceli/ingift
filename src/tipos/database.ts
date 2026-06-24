@@ -28,10 +28,6 @@ export interface Database {
         margemMultiplicador: number
         taxaFalha: number
         taxaMarketplace: number
-        custoEmbalagem: number
-        custoFrete: number
-        custoAcabamento: number
-        outrosFixos: number
         ativo: boolean
         criadoEm: string
         atualizadoEm: string
@@ -107,26 +103,12 @@ export interface Database {
         configuracaoImpressoraId: string | null
         travado: boolean
         validoAte: string | null
+        prazoEntrega: string | null
+        origem: string
+        idExterno: string | null
         observacoes: string | null
         custoSubtotal: number
         precoTotal: number
-        criadoEm: string
-        atualizadoEm: string
-        criadoPor: string | null
-        atualizadoPor: string | null
-      }>
-      Filamento: Tabela<{
-        id: string
-        nome: string
-        tipoMaterial: string
-        cor: string | null
-        marca: string | null
-        pesoRoloG: number
-        estoqueGramas: number
-        estoqueReservadoGramas: number
-        estoqueMinimoG: number
-        custoMedioPorKg: number
-        ativo: boolean
         criadoEm: string
         atualizadoEm: string
         criadoPor: string | null
@@ -153,16 +135,14 @@ export interface Database {
       }>
       EstoqueMovimentacao: Tabela<{
         id: string
-        filamentoId: string | null
         materialId: string | null
         tipoMovimentacaoId: string
-        quantidadeG: number
         quantidade: number | null
+        quantidadeG: number | null
         valorTotal: number | null
         fornecedor: string | null
         dataMovimentacao: string | null
         orcamentoId: string | null
-        compraFilamentoId: string | null
         observacoes: string | null
         criadoEm: string
         criadoPor: string | null
@@ -176,32 +156,63 @@ export interface Database {
       OrcamentoItem: Tabela<{
         id: string
         orcamentoId: string
-        produtoId: string | null
+        tipoItem: string
+        aplicarMargem: boolean
         nomePeca: string
         tempoHoras: number
         tempoMinutos: number
         quantidade: number
         pesoTotalG: number
         observacoes: string | null
+        materialId: string | null
+        custoUnitario: number
+        consumoKwh: number
+        precoKwh: number
+        valorMaquina: number
+        vidaUtilHoras: number
+        taxaFalha: number
+        margemMultiplicador: number
+        taxaMarketplace: number
+        adicional: number
+        desconto: number
         custoMaterial: number
         custoEnergia: number
         custoDepreciacao: number
+        custoProducaoTotal: number
+        custoAposFalha: number
         precoUnitario: number
         precoTotal: number
-        detalheCustos: Json
+        precoVenda: number
+        precoFinal: number
+        lucroEfetivo: number
+        margemEfetiva: number
+        idExterno: string | null
         ordem: number
         criadoEm: string
       }>
-      OrcamentoItemMaterial: Tabela<{
+      OrcamentoItemComposicao: Tabela<{
         id: string
         itemOrcamentoId: string
-        materialId: string | null
+        materialId: string
+        categoria: string
+        descricao: string | null
         tipo: string | null
         cor: string | null
         quantidade: number
-        precoUnitario: number
+        unidadeMedida: string
         custoUnitario: number
+        custoTotal: number
+        pesoG: number | null
         ordem: number
+      }>
+      OrcamentoHistoricoStatus: Tabela<{
+        id: string
+        orcamentoId: string
+        statusAnteriorId: string | null
+        statusNovoId: string
+        observacoes: string | null
+        alteradoEm: string
+        alteradoPor: string | null
       }>
     }
     Views: Record<string, never>
@@ -216,10 +227,10 @@ export type OrcamentoStatus = Database['public']['Tables']['OrcamentoStatus']['R
 export type SecaoLanding = Database['public']['Tables']['SecaoLanding']['Row']
 export type PortfolioItem = Database['public']['Tables']['PortfolioItem']['Row']
 export type Orcamento = Database['public']['Tables']['Orcamento']['Row']
-export type Filamento = Database['public']['Tables']['Filamento']['Row']
 export type Material = Database['public']['Tables']['Material']['Row']
 export type EstoqueMovimentacao = Database['public']['Tables']['EstoqueMovimentacao']['Row']
 export type EstoqueTipoMovimentacao = Database['public']['Tables']['EstoqueTipoMovimentacao']['Row']
 export type OrcamentoItem = Database['public']['Tables']['OrcamentoItem']['Row']
-export type OrcamentoItemMaterial = Database['public']['Tables']['OrcamentoItemMaterial']['Row']
+export type OrcamentoItemComposicao = Database['public']['Tables']['OrcamentoItemComposicao']['Row']
+export type OrcamentoHistoricoStatus = Database['public']['Tables']['OrcamentoHistoricoStatus']['Row']
 export type Perfil = Database['public']['Tables']['Perfil']['Row']

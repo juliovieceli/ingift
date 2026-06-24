@@ -1,24 +1,56 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { selecionarTextoAoFocar } from '@/lib/selecionarAoFocar'
 import { Botao } from '@/componentes/ui/Botao'
+import { CampoSelect } from '@/componentes/ui/CampoSelect'
 import { Input } from '@/componentes/ui/Input'
 import {
-  calcularPeca,
+  calcularItemPeca,
+  configSnapshotDeConfig,
   formatarMoeda,
+  paramsMargemDeConfig,
   type ConfigOperacional,
+  type ParamsMargemItem,
   type PecaCalculo,
-  type ResultadoPeca,
+  type ResultadoItemCompleto,
 } from '@/lib/calculadora'
 import type { Material } from '@/tipos/database'
+
+export type ErrosPecaOrcamento = Record<string, string>
+
+export function validarPecaOrcamento(peca: PecaCalculo): ErrosPecaOrcamento {
+  const erros: ErrosPecaOrcamento = {}
+
+  if (!peca.nomePeca.trim()) {
+    erros.nomePeca = 'Informe o nome da peça'
+  }
+  if (!peca.quantidade || peca.quantidade < 1) {
+    erros.quantidade = 'Quantidade mínima é 1'
+  }
+  if (peca.filamentos.length === 0) {
+    erros.filamentos = 'Adicione pelo menos um filamento'
+  }
+  peca.filamentos.forEach((fil, idx) => {
+    if (!fil.materialId) {
+      erros[`filamento.${idx}.materialId`] = 'Selecione o material de estoque'
+    }
+    if (!fil.pesoG || fil.pesoG <= 0) {
+      erros[`filamento.${idx}.pesoG`] = 'Informe o peso em gramas'
+    }
+  })
+
+  return erros
+}
 
 interface Props {
   config: ConfigOperacional
   peca: PecaCalculo
   onChange: (peca: PecaCalculo) => void
-  resultado: ResultadoPeca | null
-  onResultado: (r: ResultadoPeca | null) => void
+  resultado: ResultadoItemCompleto | null
+  params?: ParamsMargemItem
   materiais?: Material[]
   mostrarCalcular?: boolean
+  erros?: ErrosPecaOrcamento
+  onLimparErro?: (chave: string) => void
 }
 
 export function FormularioPecaOrcamento({
@@ -26,14 +58,15 @@ export function FormularioPecaOrcamento({
   peca,
   onChange,
   resultado,
-  onResultado,
+  params,
   materiais = [],
   mostrarCalcular = true,
+  erros = {},
+  onLimparErro,
 }: Props) {
   const filamentosMat = materiais.filter((m) => m.categoria === 'filamento')
   const insumosMat = materiais.filter((m) => m.categoria !== 'filamento')
-
-  const calcular = () => onResultado(calcularPeca(config, peca))
+  const margem = params ?? paramsMargemDeConfig(config)
 
   return (
     <div className="space-y-4">
@@ -41,44 +74,63 @@ export function FormularioPecaOrcamento({
         <Input
           rotulo="Nome da peça *"
           value={peca.nomePeca}
-          onChange={(e) => onChange({ ...peca, nomePeca: e.target.value })}
+          erro={erros.nomePeca}
+          onChange={(e) => {
+            onLimparErro?.('nomePeca')
+            onChange({ ...peca, nomePeca: e.target.value })
+          }}
           required
         />
         <div className="grid grid-cols-3 gap-2">
           <Input rotulo="Horas" type="number" value={peca.tempoHoras} onChange={(e) => onChange({ ...peca, tempoHoras: +e.target.value })} />
           <Input rotulo="Min" type="number" value={peca.tempoMinutos} onChange={(e) => onChange({ ...peca, tempoMinutos: +e.target.value })} />
-          <Input rotulo="Qtd" type="number" min={1} value={peca.quantidade} onChange={(e) => onChange({ ...peca, quantidade: +e.target.value })} />
+          <Input
+            rotulo="Qtd"
+            type="number"
+            min={1}
+            value={peca.quantidade}
+            erro={erros.quantidade}
+            onChange={(e) => {
+              onLimparErro?.('quantidade')
+              onChange({ ...peca, quantidade: +e.target.value })
+            }}
+          />
         </div>
       </div>
 
-      <p className="text-xs font-medium text-[var(--texto-muted)]">Filamentos</p>
+      <div>
+        <p className="text-xs font-medium text-[var(--texto-muted)]">Filamentos</p>
+        {erros.filamentos && <p className="mt-1 text-xs text-erro">{erros.filamentos}</p>}
+      </div>
       {peca.filamentos.map((fil, idx) => (
         <div key={idx} className="mb-3 grid grid-cols-2 gap-2 rounded-lg border border-[var(--borda)] p-3 md:grid-cols-6">
           {filamentosMat.length > 0 && (
-            <label className="flex flex-col gap-1 text-sm md:col-span-2">
-              <span className="text-[var(--texto-secundario)]">Material estoque</span>
-              <select
-                value={fil.materialId ?? ''}
-                onChange={(e) => {
-                  const f = [...peca.filamentos]
-                  const mat = filamentosMat.find((m) => m.id === e.target.value)
-                  f[idx] = {
-                    ...fil,
-                    materialId: e.target.value || undefined,
-                    tipo: mat?.tipoMaterial ?? fil.tipo,
-                    cor: mat?.cor ?? fil.cor,
-                    precoPorKg: mat ? Number(mat.custoMedioUnitario) * 1000 : fil.precoPorKg,
-                  }
-                  onChange({ ...peca, filamentos: f })
-                }}
-                className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-2 py-2 text-sm"
-              >
-                <option value="">Manual</option>
-                {filamentosMat.map((m) => (
-                  <option key={m.id} value={m.id}>{m.nome}</option>
-                ))}
-              </select>
-            </label>
+            <CampoSelect
+              rotulo="Material estoque"
+              className="text-sm md:col-span-2"
+              value={fil.materialId}
+              required
+              erro={erros[`filamento.${idx}.materialId`]}
+              onChange={(e) => {
+                onLimparErro?.(`filamento.${idx}.materialId`)
+                const f = [...peca.filamentos]
+                const mat = filamentosMat.find((m) => m.id === e.target.value)
+                if (!mat) return
+                f[idx] = {
+                  materialId: mat.id,
+                  tipo: mat.tipoMaterial ?? fil.tipo,
+                  cor: mat.cor ?? fil.cor,
+                  precoPorKg: Number(mat.custoMedioUnitario) * 1000,
+                  pesoG: fil.pesoG,
+                }
+                onChange({ ...peca, filamentos: f })
+              }}
+            >
+              <option value="">Selecionar material...</option>
+              {filamentosMat.map((m) => (
+                <option key={m.id} value={m.id}>{m.nome}</option>
+              ))}
+            </CampoSelect>
           )}
           <Input rotulo="Tipo" value={fil.tipo} onChange={(e) => {
             const f = [...peca.filamentos]; f[idx] = { ...fil, tipo: e.target.value }; onChange({ ...peca, filamentos: f })
@@ -89,7 +141,8 @@ export function FormularioPecaOrcamento({
           <Input rotulo="R$/kg" type="number" value={fil.precoPorKg} onChange={(e) => {
             const f = [...peca.filamentos]; f[idx] = { ...fil, precoPorKg: +e.target.value }; onChange({ ...peca, filamentos: f })
           }} />
-          <Input rotulo="Peso (g)" type="number" value={fil.pesoG} onChange={(e) => {
+          <Input rotulo="Peso (gr)" type="number" value={fil.pesoG} erro={erros[`filamento.${idx}.pesoG`]} onChange={(e) => {
+            onLimparErro?.(`filamento.${idx}.pesoG`)
             const f = [...peca.filamentos]; f[idx] = { ...fil, pesoG: +e.target.value }; onChange({ ...peca, filamentos: f })
           }} />
           <div className="flex items-end">
@@ -102,7 +155,10 @@ export function FormularioPecaOrcamento({
       <Botao
         variante="fantasma"
         type="button"
-        onClick={() => onChange({ ...peca, filamentos: [...peca.filamentos, { tipo: 'PLA', cor: '', precoPorKg: 120, pesoG: 0 }] })}
+        onClick={() => {
+          onLimparErro?.('filamentos')
+          onChange({ ...peca, filamentos: [...peca.filamentos, { materialId: '', tipo: 'PLA', cor: '', precoPorKg: 0, pesoG: 0 }] })
+        }}
       >
         <Plus className="h-4 w-4" /> Filamento
       </Botao>
@@ -153,7 +209,7 @@ export function FormularioPecaOrcamento({
       <Botao
         variante="fantasma"
         type="button"
-        onClick={() => onChange({ ...peca, insumos: [...(peca.insumos ?? []), { nome: '', quantidade: 1, custoUnitario: 0 }] })}
+        onClick={() => onChange({ ...peca, insumos: [...(peca.insumos ?? []), { materialId: '', nome: '', quantidade: 1, custoUnitario: 0 }] })}
       >
         <Plus className="h-4 w-4" /> Insumo
       </Botao>
@@ -170,16 +226,17 @@ export function FormularioPecaOrcamento({
       </label>
 
       {mostrarCalcular && (
-        <Botao type="button" onClick={calcular}>Calcular</Botao>
+        <Botao type="button" onClick={() => calcularItemPeca(configSnapshotDeConfig(config), peca, margem)}>
+          Calcular
+        </Botao>
       )}
 
       {resultado && (
-        <div className="grid grid-cols-2 gap-3 rounded-xl border border-secondary-500/30 bg-secondary-500/5 p-4 md:grid-cols-5">
-          <div><p className="text-xs text-[var(--texto-muted)]">Material</p><p className="font-semibold">{formatarMoeda(resultado.custoMaterial)}</p></div>
-          <div><p className="text-xs text-[var(--texto-muted)]">Energia</p><p className="font-semibold">{formatarMoeda(resultado.custoEnergia)}</p></div>
-          <div><p className="text-xs text-[var(--texto-muted)]">Depreciação</p><p className="font-semibold">{formatarMoeda(resultado.custoDepreciacao)}</p></div>
-          <div><p className="text-xs text-[var(--texto-muted)]">Unitário</p><p className="font-semibold text-secondary-600">{formatarMoeda(resultado.precoUnitario)}</p></div>
-          <div><p className="text-xs text-[var(--texto-muted)]">Total ({peca.quantidade}x)</p><p className="text-lg font-bold text-secondary-600">{formatarMoeda(resultado.precoTotal)}</p></div>
+        <div className="grid grid-cols-2 gap-3 rounded-xl border border-secondary-500/30 bg-secondary-500/5 p-4 md:grid-cols-4">
+          <div><p className="text-xs text-[var(--texto-muted)]">Custo produção</p><p className="font-semibold">{formatarMoeda(resultado.custoProducaoTotal)}</p></div>
+          <div><p className="text-xs text-[var(--texto-muted)]">Preço venda</p><p className="font-semibold">{formatarMoeda(resultado.precoVenda)}</p></div>
+          <div><p className="text-xs text-[var(--texto-muted)]">Preço final</p><p className="font-semibold text-secondary-600">{formatarMoeda(resultado.precoFinal)}</p></div>
+          <div><p className="text-xs text-[var(--texto-muted)]">Lucro</p><p className="font-semibold text-sucesso">{formatarMoeda(resultado.lucroEfetivo)}</p></div>
         </div>
       )}
     </div>
@@ -192,6 +249,6 @@ export const pecaVazia = (): PecaCalculo => ({
   tempoMinutos: 0,
   quantidade: 1,
   observacoes: '',
-  filamentos: [{ tipo: 'PLA', cor: '', precoPorKg: 120, pesoG: 0 }],
+  filamentos: [],
   insumos: [],
 })

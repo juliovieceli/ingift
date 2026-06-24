@@ -20,28 +20,7 @@ export function PaginaEstoque() {
     queryFn: async () => {
       if (!supabase) return []
       const { data, error } = await supabase.from('Material').select('*').eq('ativo', true).order('nome')
-      if (error) {
-        const { data: fil } = await supabase.from('Filamento').select('*').eq('ativo', true).order('nome')
-        return (fil ?? []).map((f) => ({
-          id: f.id,
-          nome: f.nome,
-          descricao: null,
-          categoria: 'filamento',
-          unidadeMedida: 'g',
-          estoqueAtual: f.estoqueGramas,
-          estoqueReservado: f.estoqueReservadoGramas,
-          estoqueMinimo: f.estoqueMinimoG,
-          custoMedioUnitario: Number(f.custoMedioPorKg) / 1000,
-          tipoMaterial: f.tipoMaterial,
-          cor: f.cor,
-          marca: f.marca,
-          ativo: f.ativo,
-          criadoEm: f.criadoEm,
-          atualizadoEm: f.atualizadoEm,
-          criadoPor: f.criadoPor,
-          atualizadoPor: f.atualizadoPor,
-        })) as Material[]
-      }
+      if (error) throw error
       return (data ?? []) as Material[]
     },
   })

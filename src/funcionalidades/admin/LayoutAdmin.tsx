@@ -1,7 +1,6 @@
 import { NavLink, Navigate, Outlet } from 'react-router-dom'
 import {
   ArrowLeftRight,
-  Calculator,
   ClipboardList,
   Cog,
   LayoutDashboard,
@@ -19,7 +18,6 @@ const links = [
   { to: '/admin', fim: true, rotulo: 'Dashboard', icone: LayoutDashboard },
   { to: '/admin/clientes', rotulo: 'Clientes', icone: Users },
   { to: '/admin/orcamentos', rotulo: 'Orçamentos', icone: ClipboardList },
-  { to: '/admin/calculadora', rotulo: 'Calculadora', icone: Calculator },
   { to: '/admin/estoque', rotulo: 'Estoque', icone: Package },
   { to: '/admin/movimentacoes', rotulo: 'Movimentações', icone: ArrowLeftRight },
   { to: '/admin/impressoras', rotulo: 'Impressoras', icone: Printer },

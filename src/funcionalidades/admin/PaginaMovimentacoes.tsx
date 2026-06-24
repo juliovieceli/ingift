@@ -62,7 +62,7 @@ export function PaginaMovimentacoes() {
           { id: 'criadoEm', rotulo: 'Data', ordenavel: true, render: (m) => new Date(m.criadoEm).toLocaleDateString('pt-BR') },
           { id: 'material', rotulo: 'Material', render: (m) => m.Material?.nome ?? '—' },
           { id: 'tipo', rotulo: 'Tipo', render: (m) => m.EstoqueTipoMovimentacao?.nome ?? '—' },
-          { id: 'quantidade', rotulo: 'Qtd', render: (m) => `${m.quantidade ?? m.quantidadeG} ${m.Material?.unidadeMedida ?? ''}` },
+          { id: 'quantidade', rotulo: 'Qtd', render: (m) => `${m.quantidade ?? 0} ${m.Material?.unidadeMedida ?? ''}` },
           { id: 'valorTotal', rotulo: 'Valor', render: (m) => m.valorTotal != null ? formatarMoeda(Number(m.valorTotal)) : '—' },
           { id: 'fornecedor', rotulo: 'Fornecedor', render: (m) => m.fornecedor ?? '—' },
           { id: 'observacoes', rotulo: 'Obs', render: (m) => m.observacoes ?? '—' },

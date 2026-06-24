@@ -36,7 +36,7 @@ export function PaginaImpressoras() {
         <div>
           <h2 className="text-2xl font-bold text-[var(--texto)]">Configuração de impressoras</h2>
           <p className="mt-1 text-sm text-[var(--texto-muted)]">
-            Cada impressora guarda máquina/energia, margens e logística como base da calculadora.
+            Cada impressora guarda máquina/energia e margens como base da calculadora.
           </p>
         </div>
         <Botao onClick={() => setModal({ aberto: true, impressora: null })}>Nova impressora</Botao>

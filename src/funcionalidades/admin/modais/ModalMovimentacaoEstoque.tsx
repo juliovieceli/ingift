@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { selecionarTextoAoFocar } from '@/lib/selecionarAoFocar'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { formatarMoeda } from '@/lib/calculadora'
 import { Botao } from '@/componentes/ui/Botao'
 import { Input } from '@/componentes/ui/Input'
 import { Modal } from '@/componentes/ui/Modal'
@@ -34,6 +35,7 @@ interface Props {
 }
 
 export function ModalMovimentacaoEstoque({ aberto, materialIdInicial, onFechar, onSalvo }: Props) {
+  const qc = useQueryClient()
   const [form, setForm] = useState(formVazio)
   const [erro, setErro] = useState('')
 
@@ -72,19 +74,21 @@ export function ModalMovimentacaoEstoque({ aberto, materialIdInicial, onFechar, 
 
   const tipoAtual = TIPOS.find((t) => t.id === form.tipoCodigo)!
   const matSel = materiais.data?.find((m) => m.id === form.materialId)
+  const qtd = Number(form.quantidade)
+  const valor = Number(form.valorTotal)
+  const custoUnitario = tipoAtual.entrada && qtd > 0 && valor >= 0 ? valor / qtd : null
 
   const salvar = useMutation({
     mutationFn: async () => {
       if (!supabase) throw new Error('Supabase não configurado')
       if (!form.materialId) throw new Error('Selecione o material')
-      const qtd = Number(form.quantidade)
       if (!qtd || qtd <= 0) throw new Error('Quantidade inválida')
 
       const tipoRow = tipos.data?.find((t) => t.codigo === form.tipoCodigo)
       if (!tipoRow) throw new Error('Tipo de movimentação não encontrado')
 
-      const valor = tipoAtual.entrada ? Number(form.valorTotal) : null
-      if (tipoAtual.entrada && (valor == null || valor < 0)) {
+      const valorEntrada = tipoAtual.entrada ? valor : null
+      if (tipoAtual.entrada && (valorEntrada == null || valorEntrada < 0)) {
         throw new Error('Informe o valor total da entrada')
       }
 
@@ -93,14 +97,17 @@ export function ModalMovimentacaoEstoque({ aberto, materialIdInicial, onFechar, 
         tipoMovimentacaoId: tipoRow.id,
         quantidade: qtd,
         quantidadeG: qtd,
-        valorTotal: valor,
+        valorTotal: valorEntrada,
         fornecedor: form.fornecedor || null,
         dataMovimentacao: form.dataMov,
         observacoes: form.obs || null,
       })
-      if (error) throw error
+      if (error) throw new Error(error.message)
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['materiais'] })
+      qc.invalidateQueries({ queryKey: ['movimentacoes'] })
+      qc.invalidateQueries({ queryKey: ['movimentacoes-material'] })
       onSalvo()
       onFechar()
     },
@@ -185,6 +192,20 @@ export function ModalMovimentacaoEstoque({ aberto, materialIdInicial, onFechar, 
             rows={2}
           />
         </label>
+
+        {tipoAtual.entrada && custoUnitario != null && qtd > 0 && valor >= 0 && (
+          <div className="rounded-lg border border-secondary-500/30 bg-secondary-500/5 p-3 sm:col-span-2">
+            <p className="text-xs text-[var(--texto-muted)]">Custo unitário calculado</p>
+            <p className="font-semibold text-secondary-600">
+              {formatarMoeda(custoUnitario)}/{matSel?.unidadeMedida ?? 'un'}
+            </p>
+            {matSel?.categoria === 'filamento' && (
+              <p className="mt-1 text-xs text-[var(--texto-muted)]">
+                Equivalente: {formatarMoeda(custoUnitario * 1000)}/kg
+              </p>
+            )}
+          </div>
+        )}
 
         {erro && <p className="text-sm text-erro sm:col-span-2">{erro}</p>}
 

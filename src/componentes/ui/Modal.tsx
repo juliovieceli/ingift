@@ -6,17 +6,19 @@ interface Props {
   onFechar: () => void
   titulo: string
   children: ReactNode
-  largura?: 'md' | 'lg' | 'xl'
+  largura?: 'md' | 'lg' | 'xl' | '2xl'
 }
 
 const larguras = {
   md: 'max-w-md',
   lg: 'max-w-2xl',
   xl: 'max-w-4xl',
+  '2xl': 'max-w-6xl',
 }
 
 export function Modal({ aberto, onFechar, titulo, children, largura = 'lg' }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
+  const fechamentoProgramatico = useRef(false)
 
   useEffect(() => {
     if (!aberto) return
@@ -24,16 +26,25 @@ export function Modal({ aberto, onFechar, titulo, children, largura = 'lg' }: Pr
     if (!el) return
     el.showModal()
     return () => {
+      fechamentoProgramatico.current = true
       if (el.open) el.close()
     }
   }, [aberto])
+
+  const fechar = () => {
+    if (fechamentoProgramatico.current) {
+      fechamentoProgramatico.current = false
+      return
+    }
+    onFechar()
+  }
 
   if (!aberto) return null
 
   return (
     <dialog
       ref={ref}
-      onClose={onFechar}
+      onClose={fechar}
       onCancel={(e) => {
         e.preventDefault()
         onFechar()

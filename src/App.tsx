@@ -22,8 +22,8 @@ const PaginaClientes = lazy(() =>
 const PaginaOrcamentos = lazy(() =>
   import('@/funcionalidades/admin/PaginaOrcamentos').then((m) => ({ default: m.PaginaOrcamentos }))
 )
-const PaginaCalculadora = lazy(() =>
-  import('@/funcionalidades/admin/PaginaCalculadora').then((m) => ({ default: m.PaginaCalculadora }))
+const PaginaDetalheOrcamento = lazy(() =>
+  import('@/funcionalidades/admin/PaginaDetalheOrcamento').then((m) => ({ default: m.PaginaDetalheOrcamento }))
 )
 const PaginaEstoque = lazy(() =>
   import('@/funcionalidades/admin/PaginaEstoque').then((m) => ({ default: m.PaginaEstoque }))
@@ -36,9 +36,6 @@ const PaginaImpressoras = lazy(() =>
 )
 const PaginaConfiguracoes = lazy(() =>
   import('@/funcionalidades/admin/PaginaConfiguracoes').then((m) => ({ default: m.PaginaConfiguracoes }))
-)
-const PaginaDetalheOrcamento = lazy(() =>
-  import('@/funcionalidades/admin/PaginaDetalheOrcamento').then((m) => ({ default: m.PaginaDetalheOrcamento }))
 )
 const PaginaCms = lazy(() =>
   import('@/funcionalidades/cms/PaginaCms').then((m) => ({ default: m.PaginaCms }))
@@ -90,7 +87,6 @@ export default function App() {
               <Route path="orcamentos" element={<Suspense fallback={<Carregando />}><PaginaOrcamentos /></Suspense>} />
               <Route path="orcamentos/:id" element={<Suspense fallback={<Carregando />}><PaginaDetalheOrcamento /></Suspense>} />
               <Route path="cms" element={<Suspense fallback={<Carregando />}><PaginaCms /></Suspense>} />
-              <Route path="calculadora" element={<Suspense fallback={<Carregando />}><PaginaCalculadora /></Suspense>} />
               <Route path="estoque" element={<Suspense fallback={<Carregando />}><PaginaEstoque /></Suspense>} />
               <Route path="movimentacoes" element={<Suspense fallback={<Carregando />}><PaginaMovimentacoes /></Suspense>} />
               <Route path="impressoras" element={<Suspense fallback={<Carregando />}><PaginaImpressoras /></Suspense>} />

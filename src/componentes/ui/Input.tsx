@@ -3,6 +3,7 @@ import { selecionarTextoAoFocar } from '@/lib/selecionarAoFocar'
 
 interface Props extends InputHTMLAttributes<HTMLInputElement> {
   rotulo?: string
+  erro?: string
 }
 
 function criarEventoChange(input: HTMLInputElement, valor: string): ChangeEvent<HTMLInputElement> {
@@ -19,7 +20,7 @@ function valorNumericoFinal(texto: string): string {
   return Number.isFinite(n) ? bruto : '0'
 }
 
-export function Input({ rotulo, className = '', id, type, value, onChange, onFocus, onBlur, ...props }: Props) {
+export function Input({ rotulo, erro, className = '', id, type, value, onChange, onFocus, onBlur, ...props }: Props) {
   const inputId = id ?? rotulo?.toLowerCase().replace(/\s/g, '-')
   const [textoEditando, setTextoEditando] = useState<string | null>(null)
   const isNumber = type === 'number'
@@ -48,6 +49,10 @@ export function Input({ rotulo, className = '', id, type, value, onChange, onFoc
     onBlur?.(e)
   }
 
+  const borda = erro
+    ? 'border-erro focus:border-erro'
+    : 'border-[var(--borda)] focus:border-secondary-500'
+
   return (
     <label className="flex flex-col gap-1 text-sm">
       {rotulo && <span className="text-[var(--texto-secundario)]">{rotulo}</span>}
@@ -58,9 +63,10 @@ export function Input({ rotulo, className = '', id, type, value, onChange, onFoc
         onFocus={handleFocus}
         onChange={handleChange}
         onBlur={handleBlur}
-        className={`rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2 text-[var(--texto)] outline-none focus:border-secondary-500 ${className}`}
+        className={`rounded-lg border bg-[var(--superficie)] px-3 py-2 text-[var(--texto)] outline-none ${borda} ${className}`}
         {...props}
       />
+      {erro && <span className="text-xs text-erro">{erro}</span>}
     </label>
   )
 }

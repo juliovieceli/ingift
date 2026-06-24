@@ -7,14 +7,14 @@ export function PaginaDashboard() {
     queryKey: ['dashboard'],
     queryFn: async () => {
       if (!supabase) return { clientes: 0, orcamentos: 0, estoqueBaixo: 0 }
-      const [c, o, f] = await Promise.all([
+      const [c, o, m] = await Promise.all([
         supabase.from('Cliente').select('id', { count: 'exact', head: true }),
         supabase.from('Orcamento').select('id', { count: 'exact', head: true }),
-        supabase.from('Filamento').select('*').eq('ativo', true),
+        supabase.from('Material').select('*').eq('ativo', true),
       ])
-      const filamentos = (f.data ?? []) as { estoqueGramas: number; estoqueReservadoGramas: number; estoqueMinimoG: number }[]
-      const estoqueBaixo = filamentos.filter(
-        (x) => x.estoqueGramas - x.estoqueReservadoGramas <= x.estoqueMinimoG
+      const materiais = (m.data ?? []) as { estoqueAtual: number; estoqueReservado: number; estoqueMinimo: number }[]
+      const estoqueBaixo = materiais.filter(
+        (x) => x.estoqueAtual - x.estoqueReservado <= x.estoqueMinimo,
       ).length
       return {
         clientes: c.count ?? 0,

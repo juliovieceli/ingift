@@ -24,10 +24,6 @@ const padrao = {
   margemMultiplicador: 2.5,
   taxaFalha: 0.15,
   taxaMarketplace: 0,
-  custoEmbalagem: 0,
-  custoFrete: 0,
-  custoAcabamento: 0,
-  outrosFixos: 0,
   ativo: true,
 }
 
@@ -47,10 +43,6 @@ export function ModalImpressora({ aberto, impressora, onFechar, onSalvo }: Props
         margemMultiplicador: Number(impressora.margemMultiplicador),
         taxaFalha: Number(impressora.taxaFalha),
         taxaMarketplace: Number(impressora.taxaMarketplace),
-        custoEmbalagem: Number(impressora.custoEmbalagem),
-        custoFrete: Number(impressora.custoFrete),
-        custoAcabamento: Number(impressora.custoAcabamento),
-        outrosFixos: Number(impressora.outrosFixos),
         ativo: impressora.ativo,
       })
     } else {
@@ -124,14 +116,6 @@ export function ModalImpressora({ aberto, impressora, onFechar, onSalvo }: Props
           <Input rotulo="Margem (mult.)" type="number" step="0.1" value={form.margemMultiplicador} onChange={(e) => num('margemMultiplicador', e.target.value)} />
           <Input rotulo="Taxa falha" type="number" step="0.01" value={form.taxaFalha} onChange={(e) => num('taxaFalha', e.target.value)} />
           <Input rotulo="Taxa marketplace" type="number" step="0.01" value={form.taxaMarketplace} onChange={(e) => num('taxaMarketplace', e.target.value)} />
-        </div>
-
-        <p className="text-xs font-medium text-[var(--texto-muted)]">Logística (custos fixos)</p>
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-          <Input rotulo="Embalagem (R$)" type="number" step="0.01" value={form.custoEmbalagem} onChange={(e) => num('custoEmbalagem', e.target.value)} />
-          <Input rotulo="Frete (R$)" type="number" step="0.01" value={form.custoFrete} onChange={(e) => num('custoFrete', e.target.value)} />
-          <Input rotulo="Acabamento (R$)" type="number" step="0.01" value={form.custoAcabamento} onChange={(e) => num('custoAcabamento', e.target.value)} />
-          <Input rotulo="Outros fixos (R$)" type="number" step="0.01" value={form.outrosFixos} onChange={(e) => num('outrosFixos', e.target.value)} />
         </div>
 
         {erro && <p className="text-sm text-erro">{erro}</p>}
