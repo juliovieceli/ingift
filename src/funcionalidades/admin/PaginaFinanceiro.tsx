@@ -14,7 +14,7 @@ import {
 } from '@/lib/financeiro'
 import { useOrdenacaoPaginacao } from '@/hooks/useOrdenacaoPaginacao'
 import { Botao } from '@/componentes/ui/Botao'
-import { Card, TituloCard } from '@/componentes/ui/Card'
+import { Card } from '@/componentes/ui/Card'
 import { TabelaDados } from '@/componentes/ui/TabelaDados'
 import { Modal } from '@/componentes/ui/Modal'
 import { ModalPlanoConta } from '@/funcionalidades/admin/modais/ModalPlanoConta'

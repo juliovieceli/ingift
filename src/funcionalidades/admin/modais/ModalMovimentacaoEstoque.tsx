@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { selecionarTextoAoFocar } from '@/lib/selecionarAoFocar'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
@@ -38,14 +38,21 @@ interface Props {
   onSalvo: () => void
 }
 
-export function ModalMovimentacaoEstoque({ aberto, materialIdInicial, onFechar, onSalvo }: Props) {
+function criarForm(materialIdInicial?: string) {
+  return { ...formVazio(), materialId: materialIdInicial ?? '' }
+}
+
+function FormularioMovimentacaoEstoque({
+  materialIdInicial,
+  onFechar,
+  onSalvo,
+}: Omit<Props, 'aberto'>) {
   const qc = useQueryClient()
-  const [form, setForm] = useState(formVazio)
+  const [form, setForm] = useState(() => criarForm(materialIdInicial))
   const [erro, setErro] = useState('')
 
   const materiais = useQuery({
     queryKey: ['materiais'],
-    enabled: aberto,
     queryFn: async () => {
       if (!supabase) return []
       const { data } = await supabase
@@ -59,7 +66,6 @@ export function ModalMovimentacaoEstoque({ aberto, materialIdInicial, onFechar, 
 
   const tipos = useQuery({
     queryKey: ['tipos-movimentacao'],
-    enabled: aberto,
     queryFn: async () => {
       if (!supabase) return []
       const { data } = await supabase.from('EstoqueTipoMovimentacao').select('*')
@@ -69,7 +75,6 @@ export function ModalMovimentacaoEstoque({ aberto, materialIdInicial, onFechar, 
 
   const planoContas = useQuery({
     queryKey: ['plano-contas'],
-    enabled: aberto,
     queryFn: async () => {
       if (!supabase) return []
       const { data } = await supabase
@@ -82,18 +87,11 @@ export function ModalMovimentacaoEstoque({ aberto, materialIdInicial, onFechar, 
     },
   })
 
-  useEffect(() => {
-    if (!aberto) return
-    setForm({ ...formVazio(), materialId: materialIdInicial ?? '' })
-    setErro('')
-  }, [aberto, materialIdInicial])
-
-  // pré-selecionar plano de contas default
-  useEffect(() => {
-    if (!aberto || !planoContas.data?.length || form.planoContaId) return
-    const padrao = planoContas.data.find((c) => c.codigo === CODIGO_DEFAULT_DESPESA)
-    if (padrao) setForm((f) => ({ ...f, planoContaId: padrao.id }))
-  }, [aberto, planoContas.data, form.planoContaId])
+  const padraoPlanoId =
+    planoContas.data?.find((c) => c.codigo === CODIGO_DEFAULT_DESPESA)?.id
+    ?? planoContas.data?.[0]?.id
+    ?? ''
+  const planoSelecionado = form.planoContaId || padraoPlanoId
 
   const tipoAtual = TIPOS.find((t) => t.id === form.tipoCodigo)!
   const matSel = materiais.data?.find((m) => m.id === form.materialId)
@@ -133,10 +131,10 @@ export function ModalMovimentacaoEstoque({ aberto, materialIdInicial, onFechar, 
       if (error) throw new Error(error.message)
 
       // gerar despesa financeira se solicitado
-      if (form.gerarDespesa && podeGerarDespesa && movData?.id && form.planoContaId) {
+      if (form.gerarDespesa && podeGerarDespesa && movData?.id && planoSelecionado) {
         await criarDespesaCompra(supabase, {
           movimentacaoId: movData.id,
-          planoContaId: form.planoContaId,
+          planoContaId: planoSelecionado,
           vencimento: form.dataVencimento,
         })
       }
@@ -154,8 +152,7 @@ export function ModalMovimentacaoEstoque({ aberto, materialIdInicial, onFechar, 
   })
 
   return (
-    <Modal aberto={aberto} onFechar={onFechar} titulo="Registrar movimentação" largura="lg">
-      <form
+    <form
         onSubmit={(e) => { e.preventDefault(); salvar.mutate() }}
         className="grid gap-4 sm:grid-cols-2"
       >
@@ -266,7 +263,7 @@ export function ModalMovimentacaoEstoque({ aberto, materialIdInicial, onFechar, 
                 <label className="flex flex-col gap-1 text-sm">
                   <span className="text-[var(--texto-secundario)]">Plano de contas</span>
                   <select
-                    value={form.planoContaId}
+                    value={planoSelecionado}
                     onChange={(e) => setForm({ ...form, planoContaId: e.target.value })}
                     required
                     className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2 text-[var(--texto)]"
@@ -299,6 +296,20 @@ export function ModalMovimentacaoEstoque({ aberto, materialIdInicial, onFechar, 
           </Botao>
         </div>
       </form>
+  )
+}
+
+export function ModalMovimentacaoEstoque({ aberto, materialIdInicial, onFechar, onSalvo }: Props) {
+  return (
+    <Modal aberto={aberto} onFechar={onFechar} titulo="Registrar movimentação" largura="lg">
+      {aberto && (
+        <FormularioMovimentacaoEstoque
+          key={materialIdInicial ?? 'novo'}
+          materialIdInicial={materialIdInicial}
+          onFechar={onFechar}
+          onSalvo={onSalvo}
+        />
+      )}
     </Modal>
   )
 }

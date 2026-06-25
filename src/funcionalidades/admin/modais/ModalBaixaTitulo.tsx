@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { formatarMoeda } from '@/lib/calculadora'
@@ -8,24 +8,23 @@ import { Input } from '@/componentes/ui/Input'
 import { Modal } from '@/componentes/ui/Modal'
 import type { FinanceiroContaCaixa, FinanceiroTitulo } from '@/tipos/database'
 
-interface Props {
-  aberto: boolean
-  titulo: FinanceiroTitulo | null
+interface FormProps {
+  titulo: FinanceiroTitulo
   onFechar: () => void
   onSalvo: () => void
 }
 
-export function ModalBaixaTitulo({ aberto, titulo, onFechar, onSalvo }: Props) {
+function FormularioBaixaTitulo({ titulo, onFechar, onSalvo }: FormProps) {
   const qc = useQueryClient()
+  const saldo = saldoPendente(titulo)
   const [contaId, setContaId] = useState('')
-  const [valor, setValor] = useState('')
+  const [valor, setValor] = useState(saldo.toFixed(2))
   const [dataBaixa, setDataBaixa] = useState(new Date().toISOString().slice(0, 10))
   const [obs, setObs] = useState('')
   const [erro, setErro] = useState('')
 
   const contasCaixa = useQuery({
     queryKey: ['contas-caixa'],
-    enabled: aberto,
     queryFn: async () => {
       if (!supabase) return []
       const { data } = await supabase
@@ -37,29 +36,19 @@ export function ModalBaixaTitulo({ aberto, titulo, onFechar, onSalvo }: Props) {
     },
   })
 
-  useEffect(() => {
-    if (!aberto || !titulo) return
-    const saldo = saldoPendente(titulo)
-    setValor(saldo.toFixed(2))
-    setDataBaixa(new Date().toISOString().slice(0, 10))
-    setObs('')
-    setErro('')
-    // pré-selecionar primeira conta
-    if (contasCaixa.data?.length) setContaId(contasCaixa.data[0].id)
-  }, [aberto, titulo, contasCaixa.data])
+  const contaSelecionada = contaId || contasCaixa.data?.[0]?.id || ''
 
   const salvar = useMutation({
     mutationFn: async () => {
-      if (!supabase || !titulo) throw new Error('Dados inválidos')
-      if (!contaId) throw new Error('Selecione a conta de destino')
+      if (!supabase) throw new Error('Dados inválidos')
+      if (!contaSelecionada) throw new Error('Selecione a conta de destino')
       const v = Number(valor)
       if (!v || v <= 0) throw new Error('Informe um valor válido')
-      const saldo = saldoPendente(titulo)
       if (v > saldo) throw new Error(`Valor supera o saldo pendente de ${formatarMoeda(saldo)}`)
 
       await registrarBaixaTitulo(supabase, {
         tituloId: titulo.id,
-        contaId,
+        contaId: contaSelecionada,
         valor: v,
         dataBaixa,
         obs: obs.trim() || undefined,
@@ -75,12 +64,8 @@ export function ModalBaixaTitulo({ aberto, titulo, onFechar, onSalvo }: Props) {
     onError: (e) => setErro(e instanceof Error ? e.message : 'Erro ao registrar baixa'),
   })
 
-  if (!titulo) return null
-
-  const saldo = saldoPendente(titulo)
-
   return (
-    <Modal aberto={aberto} onFechar={onFechar} titulo="Registrar baixa" largura="md">
+    <>
       <div className="mb-4 rounded-lg bg-[var(--fundo)] px-4 py-3 text-sm">
         <p className="font-medium text-[var(--texto)]">{titulo.descricao}</p>
         <p className="mt-1 text-[var(--texto-secundario)]">
@@ -95,7 +80,7 @@ export function ModalBaixaTitulo({ aberto, titulo, onFechar, onSalvo }: Props) {
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-[var(--texto-secundario)]">Conta de destino</span>
           <select
-            value={contaId}
+            value={contaSelecionada}
             onChange={(e) => setContaId(e.target.value)}
             required
             className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2 text-[var(--texto)]"
@@ -146,6 +131,30 @@ export function ModalBaixaTitulo({ aberto, titulo, onFechar, onSalvo }: Props) {
           </Botao>
         </div>
       </form>
+    </>
+  )
+}
+
+interface Props {
+  aberto: boolean
+  titulo: FinanceiroTitulo | null
+  onFechar: () => void
+  onSalvo: () => void
+}
+
+export function ModalBaixaTitulo({ aberto, titulo, onFechar, onSalvo }: Props) {
+  if (!titulo) return null
+
+  return (
+    <Modal aberto={aberto} onFechar={onFechar} titulo="Registrar baixa" largura="md">
+      {aberto && (
+        <FormularioBaixaTitulo
+          key={titulo.id}
+          titulo={titulo}
+          onFechar={onFechar}
+          onSalvo={onSalvo}
+        />
+      )}
     </Modal>
   )
 }

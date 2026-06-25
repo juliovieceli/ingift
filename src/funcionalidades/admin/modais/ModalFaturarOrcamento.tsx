@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { formatarMoeda } from '@/lib/calculadora'
@@ -8,23 +8,21 @@ import { Input } from '@/componentes/ui/Input'
 import { Modal } from '@/componentes/ui/Modal'
 import type { FinanceiroPlanoConta } from '@/tipos/database'
 
-interface Props {
-  aberto: boolean
-  orcamentoId: string | null
+interface FormProps {
+  orcamentoId: string
   numeroSequencial?: number
   precoTotal: number
   onFechar: () => void
   onSalvo: () => void
 }
 
-export function ModalFaturarOrcamento({
-  aberto,
+function FormularioFaturarOrcamento({
   orcamentoId,
   numeroSequencial,
   precoTotal,
   onFechar,
   onSalvo,
-}: Props) {
+}: FormProps) {
   const qc = useQueryClient()
   const [planoContaId, setPlanoContaId] = useState('')
   const [dataVencimento, setDataVencimento] = useState(new Date().toISOString().slice(0, 10))
@@ -32,7 +30,6 @@ export function ModalFaturarOrcamento({
 
   const planoContas = useQuery({
     queryKey: ['plano-contas'],
-    enabled: aberto,
     queryFn: async () => {
       if (!supabase) return []
       const { data } = await supabase
@@ -45,26 +42,20 @@ export function ModalFaturarOrcamento({
     },
   })
 
-  useEffect(() => {
-    if (!aberto) return
-    setDataVencimento(new Date().toISOString().slice(0, 10))
-    setErro('')
-  }, [aberto])
-
-  useEffect(() => {
-    if (!aberto || !planoContas.data?.length || planoContaId) return
-    const padrao = planoContas.data.find((c) => c.codigo === CODIGO_DEFAULT_RECEITA)
-    setPlanoContaId(padrao?.id ?? planoContas.data[0].id)
-  }, [aberto, planoContas.data, planoContaId])
+  const padraoId =
+    planoContas.data?.find((c) => c.codigo === CODIGO_DEFAULT_RECEITA)?.id
+    ?? planoContas.data?.[0]?.id
+    ?? ''
+  const planoSelecionado = planoContaId || padraoId
 
   const salvar = useMutation({
     mutationFn: async () => {
-      if (!supabase || !orcamentoId) throw new Error('Orçamento inválido')
-      if (!planoContaId) throw new Error('Selecione o plano de contas')
+      if (!supabase) throw new Error('Orçamento inválido')
+      if (!planoSelecionado) throw new Error('Selecione o plano de contas')
 
       await faturarOrcamento(supabase, {
         orcamentoId,
-        planoContaId,
+        planoContaId: planoSelecionado,
         vencimento: dataVencimento,
         descricao: `Orçamento #${numeroSequencial ?? ''}`,
       })
@@ -80,7 +71,7 @@ export function ModalFaturarOrcamento({
   })
 
   return (
-    <Modal aberto={aberto} onFechar={onFechar} titulo="Faturar orçamento" largura="md">
+    <>
       <div className="mb-4 rounded-lg bg-sucesso/10 px-4 py-3">
         <p className="text-xs font-medium uppercase tracking-wider text-sucesso/80">Valor a faturar</p>
         <p className="mt-1 text-2xl font-bold tabular-nums text-sucesso">
@@ -99,7 +90,7 @@ export function ModalFaturarOrcamento({
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-[var(--texto-secundario)]">Classificar em</span>
           <select
-            value={planoContaId}
+            value={planoSelecionado}
             onChange={(e) => setPlanoContaId(e.target.value)}
             required
             className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2 text-[var(--texto)]"
@@ -130,6 +121,39 @@ export function ModalFaturarOrcamento({
           </Botao>
         </div>
       </form>
+    </>
+  )
+}
+
+interface Props {
+  aberto: boolean
+  orcamentoId: string | null
+  numeroSequencial?: number
+  precoTotal: number
+  onFechar: () => void
+  onSalvo: () => void
+}
+
+export function ModalFaturarOrcamento({
+  aberto,
+  orcamentoId,
+  numeroSequencial,
+  precoTotal,
+  onFechar,
+  onSalvo,
+}: Props) {
+  return (
+    <Modal aberto={aberto} onFechar={onFechar} titulo="Faturar orçamento" largura="md">
+      {aberto && orcamentoId && (
+        <FormularioFaturarOrcamento
+          key={orcamentoId}
+          orcamentoId={orcamentoId}
+          numeroSequencial={numeroSequencial}
+          precoTotal={precoTotal}
+          onFechar={onFechar}
+          onSalvo={onSalvo}
+        />
+      )}
     </Modal>
   )
 }
