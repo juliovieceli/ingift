@@ -40,6 +40,9 @@ const PaginaConfiguracoes = lazy(() =>
 const PaginaCms = lazy(() =>
   import('@/funcionalidades/cms/PaginaCms').then((m) => ({ default: m.PaginaCms }))
 )
+const PaginaFinanceiro = lazy(() =>
+  import('@/funcionalidades/admin/PaginaFinanceiro').then((m) => ({ default: m.PaginaFinanceiro }))
+)
 
 const qc = new QueryClient()
 
@@ -91,6 +94,7 @@ export default function App() {
               <Route path="movimentacoes" element={<Suspense fallback={<Carregando />}><PaginaMovimentacoes /></Suspense>} />
               <Route path="impressoras" element={<Suspense fallback={<Carregando />}><PaginaImpressoras /></Suspense>} />
               <Route path="configuracoes" element={<Suspense fallback={<Carregando />}><PaginaConfiguracoes /></Suspense>} />
+              <Route path="financeiro" element={<Suspense fallback={<Carregando />}><PaginaFinanceiro /></Suspense>} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

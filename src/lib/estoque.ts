@@ -2,6 +2,16 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AvulsoCalculo, PecaCalculo } from '@/lib/calculadora'
 import type { OrcamentoStatus } from '@/tipos/database'
 
+import type { Material } from '@/tipos/database'
+
+export function custoMedioDoMaterial(mat?: Pick<Material, 'custoMedioUnitario'> | null): number {
+  return Number(mat?.custoMedioUnitario) || 0
+}
+
+export function precoFilamentoPorKg(mat?: Pick<Material, 'custoMedioUnitario'> | null): number {
+  return custoMedioDoMaterial(mat) * 1000
+}
+
 const CODIGOS_ESTOQUE_ORCAMENTO = ['reserva_orcamento', 'liberacao_reserva', 'saida_orcamento'] as const
 
 export async function orcamentoTemMovimentacaoEstoque(

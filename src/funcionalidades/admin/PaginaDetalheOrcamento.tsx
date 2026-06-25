@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, ChevronRight, History, Lock, Pencil, Phone, Trash2, User } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, History, Lock, Pencil, Phone, Receipt, Trash2, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatarMoeda } from '@/lib/calculadora'
 import {
@@ -10,11 +10,19 @@ import {
   precisaConfirmarReversaoEstoque,
   reverterEstoqueOrcamento,
 } from '@/lib/estoque'
+import {
+  buscarTituloDoOrcamento,
+  corStatusTitulo,
+  estornarBaixaTitulo,
+  excluirTituloFinanceiro,
+  rotuloStatusTitulo,
+} from '@/lib/financeiro'
 import { recalcularTotaisOrcamento } from '@/lib/orcamento'
 import { Botao } from '@/componentes/ui/Botao'
 import { Card } from '@/componentes/ui/Card'
 import { Modal } from '@/componentes/ui/Modal'
 import { ModalCalculadora } from '@/funcionalidades/admin/modais/ModalCalculadora'
+import { ModalFaturarOrcamento } from '@/funcionalidades/admin/modais/ModalFaturarOrcamento'
 import type { OrcamentoItemComComposicao } from '@/lib/orcamento'
 import type { OrcamentoItem, OrcamentoStatus } from '@/tipos/database'
 
@@ -34,6 +42,11 @@ export function PaginaDetalheOrcamento() {
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
   const [modalHistorico, setModalHistorico] = useState(false)
   const [modalStatus, setModalStatus] = useState(false)
+  const [modalFaturar, setModalFaturar] = useState(false)
+  const [modalLiberarFaturamento, setModalLiberarFaturamento] = useState(false)
+  const [motivoLiberacao, setMotivoLiberacao] = useState('')
+  const [erroLiberacao, setErroLiberacao] = useState('')
+  const [perguntarFaturarAposStatus, setPerguntarFaturarAposStatus] = useState(false)
 
   const abrirModal = (tipo: 'peca' | 'avulso', item: ItemComComposicao | null = null) => {
     setModalItem({ aberto: true, tipo, item })
@@ -121,6 +134,15 @@ export function PaginaDetalheOrcamento() {
     },
   })
 
+  const tituloFinanceiro = useQuery({
+    queryKey: ['titulo-financeiro-orcamento', id],
+    enabled: Boolean(id),
+    queryFn: async () => {
+      if (!supabase || !id) return null
+      return buscarTituloDoOrcamento(supabase, id)
+    },
+  })
+
   const movimentacoesEstoque = useQuery({
     queryKey: ['orcamento-mov-estoque', id],
     enabled: Boolean(id) && modalStatus,
@@ -128,6 +150,33 @@ export function PaginaDetalheOrcamento() {
       if (!supabase || !id) return false
       return orcamentoTemMovimentacaoEstoque(supabase, id)
     },
+  })
+
+  const liberarFaturamento = useMutation({
+    mutationFn: async () => {
+      if (!supabase || !id) throw new Error('Dados inválidos')
+      const titulo = tituloFinanceiro.data
+      if (!titulo) throw new Error('Título financeiro não encontrado')
+
+      // estornar baixas pendentes
+      const { data: baixas } = await supabase
+        .from('FinanceiroBaixa')
+        .select('id')
+        .eq('tituloId', titulo.id)
+      for (const b of baixas ?? []) {
+        await estornarBaixaTitulo(supabase, b.id, motivoLiberacao || undefined)
+      }
+      await excluirTituloFinanceiro(supabase, titulo.id, motivoLiberacao || undefined)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orcamento', id] })
+      qc.invalidateQueries({ queryKey: ['titulo-financeiro-orcamento', id] })
+      qc.invalidateQueries({ queryKey: ['financeiro-titulos'] })
+      setModalLiberarFaturamento(false)
+      setMotivoLiberacao('')
+      setErroLiberacao('')
+    },
+    onError: (e) => setErroLiberacao(e instanceof Error ? e.message : 'Erro ao liberar faturamento'),
   })
 
   const alterarStatus = useMutation({
@@ -163,6 +212,11 @@ export function PaginaDetalheOrcamento() {
       qc.invalidateQueries({ queryKey: ['materiais'] })
       qc.invalidateQueries({ queryKey: ['movimentacoes'] })
       qc.invalidateQueries({ queryKey: ['orcamento-mov-estoque', id] })
+      // se foi para finalizado e não está faturado, perguntar se quer faturar
+      const statusNovo = statusLista.data?.find((s) => s.id === novoStatusId)
+      if (statusNovo?.codigo === 'finalizado' && !orcamento.data?.faturado) {
+        setPerguntarFaturarAposStatus(true)
+      }
     },
     onError: (e) => {
       const msg = e instanceof Error ? e.message : 'Erro ao alterar status'
@@ -177,7 +231,7 @@ export function PaginaDetalheOrcamento() {
   const excluirItem = useMutation({
     mutationFn: async (itemId: string) => {
       if (!supabase || !id) throw new Error('Orçamento inválido')
-      if (orcamento.data?.travado) throw new Error('Orçamento travado — não é possível excluir itens')
+      if (orcamento.data?.travado || orcamento.data?.faturado) throw new Error('Orçamento travado/faturado — não é possível excluir itens')
       if (!confirm('Excluir este item do orçamento?')) return
       const { error } = await supabase.from('OrcamentoItem').delete().eq('id', itemId)
       if (error) throw error
@@ -194,7 +248,7 @@ export function PaginaDetalheOrcamento() {
   const excluirOrcamento = useMutation({
     mutationFn: async () => {
       if (!supabase || !id) throw new Error('Orçamento inválido')
-      if (orcamento.data?.travado) throw new Error('Orçamento travado — não é possível excluir')
+      if (orcamento.data?.travado || orcamento.data?.faturado) throw new Error('Orçamento travado/faturado — não é possível excluir')
 
       const { count: qtdItens, error: errItens } = await supabase
         .from('OrcamentoItem')
@@ -234,6 +288,8 @@ export function PaginaDetalheOrcamento() {
   if (!o) return <p className="text-erro">Orçamento não encontrado.</p>
 
   const travado = o.travado
+  const faturado = o.faturado ?? false
+  const bloqueado = travado || faturado
   const listaItens = itens.data ?? []
   const totalItens = listaItens.reduce(
     (s, item) => s + (Number(item.precoFinal ?? item.precoTotal) || 0),
@@ -281,9 +337,14 @@ export function PaginaDetalheOrcamento() {
                 </p>
               )}
             </div>
-            {travado && (
+            {travado && !faturado && (
               <p className="flex items-center gap-1.5 text-sm text-alerta">
                 <Lock className="h-4 w-4" /> Travado — itens não podem ser alterados
+              </p>
+            )}
+            {faturado && (
+              <p className="flex items-center gap-1.5 text-sm text-sucesso">
+                <Receipt className="h-4 w-4" /> Faturado — itens e valores bloqueados
               </p>
             )}
           </div>
@@ -330,7 +391,51 @@ export function PaginaDetalheOrcamento() {
           >
             Alterar status
           </button>
+
+          {!faturado && travado && (
+            <button
+              type="button"
+              onClick={() => setModalFaturar(true)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-sucesso transition hover:text-sucesso/80"
+            >
+              <Receipt className="h-3.5 w-3.5" /> Faturar
+            </button>
+          )}
+
+          {faturado && (
+            <button
+              type="button"
+              onClick={() => { setErroLiberacao(''); setMotivoLiberacao(''); setModalLiberarFaturamento(true) }}
+              className="inline-flex items-center gap-1.5 text-sm text-[var(--texto-muted)] transition hover:text-erro"
+            >
+              Remover faturamento
+            </button>
+          )}
         </div>
+
+        {/* Card financeiro */}
+        {tituloFinanceiro.data && (
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-[var(--borda)] bg-[var(--fundo)]/50 px-5 py-2.5">
+            <Receipt className="h-3.5 w-3.5 text-[var(--texto-muted)]" />
+            <span className="text-sm text-[var(--texto-muted)]">
+              Título financeiro:{' '}
+              <span
+                className="rounded-full px-2 py-0.5 text-xs font-medium"
+                style={{
+                  backgroundColor: `${corStatusTitulo(tituloFinanceiro.data.status)}22`,
+                  color: corStatusTitulo(tituloFinanceiro.data.status),
+                }}
+              >
+                {rotuloStatusTitulo(tituloFinanceiro.data.status)}
+              </span>
+              {' '}·{' '}
+              <strong>{formatarMoeda(tituloFinanceiro.data.valor)}</strong>
+              {' '}·{' '}
+              vence{' '}
+              {new Date(tituloFinanceiro.data.dataVencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
+            </span>
+          </div>
+        )}
       </Card>
 
       <Card className="p-0">
@@ -345,7 +450,7 @@ export function PaginaDetalheOrcamento() {
               </p>
             )}
           </div>
-          {!travado && (
+          {!bloqueado && (
             <div className="flex flex-wrap gap-2">
               <Botao onClick={() => abrirModal('peca')}>Adicionar peça</Botao>
               <Botao variante="fantasma" onClick={() => abrirModal('avulso')}>Adicionar material</Botao>
@@ -372,8 +477,8 @@ export function PaginaDetalheOrcamento() {
                 return (
                   <div key={item.id}>
                     <div
-                      className={`flex cursor-pointer items-center gap-3 px-5 py-3 transition hover:bg-[var(--fundo)]/50 ${!travado ? '' : 'cursor-default'}`}
-                      onClick={() => !travado && abrirItem(item)}
+                      className={`flex cursor-pointer items-center gap-3 px-5 py-3 transition hover:bg-[var(--fundo)]/50 ${!bloqueado ? '' : 'cursor-default'}`}
+                      onClick={() => !bloqueado && abrirItem(item)}
                       onKeyDown={() => {}}
                       role="button"
                       tabIndex={0}
@@ -405,7 +510,7 @@ export function PaginaDetalheOrcamento() {
                       <span className="tabular-nums text-sucesso font-medium">
                         {formatarMoeda(Number(item.precoFinal ?? item.precoTotal))}
                       </span>
-                      {!travado && (
+                      {!bloqueado && (
                         <div className="flex items-center gap-1">
                           <button
                             type="button"
@@ -452,7 +557,7 @@ export function PaginaDetalheOrcamento() {
           </div>
         )}
 
-        {!travado && listaItens.length === 0 && (
+        {!bloqueado && listaItens.length === 0 && (
           <div className="flex justify-end border-t border-[var(--borda)] px-5 py-3">
             <Botao
               variante="fantasma"
@@ -552,6 +657,83 @@ export function PaginaDetalheOrcamento() {
           ordemInicial={listaItens.length}
         />
       )}
+
+      <ModalFaturarOrcamento
+        aberto={modalFaturar}
+        orcamentoId={id ?? null}
+        numeroSequencial={o.numeroSequencial}
+        precoTotal={valorTotal}
+        onFechar={() => setModalFaturar(false)}
+        onSalvo={() => {
+          qc.invalidateQueries({ queryKey: ['orcamento', id] })
+          qc.invalidateQueries({ queryKey: ['titulo-financeiro-orcamento', id] })
+        }}
+      />
+
+      {/* Modal: pergunta se quer faturar ao finalizar */}
+      <Modal
+        aberto={perguntarFaturarAposStatus}
+        onFechar={() => setPerguntarFaturarAposStatus(false)}
+        titulo="Faturar orçamento?"
+        largura="md"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-[var(--texto-secundario)]">
+            O orçamento foi finalizado. Deseja gerar o título financeiro agora?
+          </p>
+          <div className="flex justify-end gap-2">
+            <Botao variante="fantasma" onClick={() => setPerguntarFaturarAposStatus(false)}>
+              Não, depois
+            </Botao>
+            <Botao
+              onClick={() => {
+                setPerguntarFaturarAposStatus(false)
+                setModalFaturar(true)
+              }}
+            >
+              Sim, faturar
+            </Botao>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal: liberar faturamento (estornar baixas + excluir título) */}
+      <Modal
+        aberto={modalLiberarFaturamento}
+        onFechar={() => setModalLiberarFaturamento(false)}
+        titulo="Remover faturamento"
+        largura="md"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-[var(--texto-secundario)]">
+            Isso estornará todas as baixas do título e o excluirá permanentemente, liberando a edição do
+            orçamento. A operação ficará registrada em log.
+          </p>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--texto-secundario)]">Motivo (opcional)</span>
+            <input
+              type="text"
+              value={motivoLiberacao}
+              onChange={(e) => setMotivoLiberacao(e.target.value)}
+              className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2 text-[var(--texto)]"
+              placeholder="Informe o motivo..."
+            />
+          </label>
+          {erroLiberacao && <p className="text-sm text-erro">{erroLiberacao}</p>}
+          <div className="flex justify-end gap-2">
+            <Botao variante="fantasma" onClick={() => setModalLiberarFaturamento(false)}>
+              Cancelar
+            </Botao>
+            <Botao
+              className="bg-erro text-white hover:bg-erro/90"
+              onClick={() => liberarFaturamento.mutate()}
+              disabled={liberarFaturamento.isPending}
+            >
+              {liberarFaturamento.isPending ? 'Removendo...' : 'Confirmar remoção'}
+            </Botao>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

@@ -98,7 +98,7 @@ export function ModalCalculadora({
     enabled: aberto,
     queryFn: async () => {
       if (!supabase) return []
-      const { data } = await supabase.from('Material').select('id, nome, unidadeMedida, categoria, estoqueAtual, estoqueReservado').eq('ativo', true).order('nome')
+      const { data } = await supabase.from('Material').select('*').eq('ativo', true).order('nome')
       return (data ?? []) as Material[]
     },
   })

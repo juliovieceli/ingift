@@ -1,9 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
-import { parseConteudo } from '@/lib/parseConteudo'
 import { buscarDadosLanding } from '@/lib/landingApi'
-import { portfolioFallback, secoesFallback } from './dadosFallback'
-import type { ContatoLanding } from './contatoLanding'
+import { parseConteudo } from '@/lib/parseConteudo'
 import type { PortfolioItem, SecaoLanding } from '@/tipos/database'
+import { useQuery } from '@tanstack/react-query'
+import type { ContatoLanding } from './contatoLanding'
+import { portfolioFallback, secoesFallback } from './dadosFallback'
 
 const agora = () => new Date().toISOString()
 
@@ -48,6 +48,8 @@ export function useLandingDados() {
       if (!dados?.secoes.length) {
         return { secoes: secoesFallback, portfolio: portfolioFallback }
       }
+
+      console.log({secoes: dados.secoes})
       return {
         secoes: normalizarSecoes(dados.secoes),
         portfolio: dados.portfolio.length
@@ -58,6 +60,7 @@ export function useLandingDados() {
   })
 
   const secao = (slug: string) => landing.data?.secoes.find((s) => s.slug === slug)
+
 
   const contato = (): ContatoLanding | undefined => {
     const raw = secao('contato')?.conteudo

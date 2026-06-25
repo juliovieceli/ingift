@@ -13,6 +13,7 @@ import {
   type PecaCalculo,
   type ResultadoItemCompleto,
 } from '@/lib/calculadora'
+import { custoMedioDoMaterial, precoFilamentoPorKg } from '@/lib/estoque'
 import type { Material } from '@/tipos/database'
 
 export type ErrosPecaOrcamento = Record<string, string>
@@ -115,12 +116,16 @@ export function FormularioPecaOrcamento({
                 onLimparErro?.(`filamento.${idx}.materialId`)
                 const f = [...peca.filamentos]
                 const mat = filamentosMat.find((m) => m.id === e.target.value)
-                if (!mat) return
+                if (!mat) {
+                  f[idx] = { ...fil, materialId: '', precoPorKg: 0 }
+                  onChange({ ...peca, filamentos: f })
+                  return
+                }
                 f[idx] = {
                   materialId: mat.id,
                   tipo: mat.tipoMaterial ?? fil.tipo,
                   cor: mat.cor ?? fil.cor,
-                  precoPorKg: Number(mat.custoMedioUnitario) * 1000,
+                  precoPorKg: precoFilamentoPorKg(mat),
                   pesoG: fil.pesoG,
                 }
                 onChange({ ...peca, filamentos: f })
@@ -173,11 +178,15 @@ export function FormularioPecaOrcamento({
               onChange={(e) => {
                 const lista = [...(peca.insumos ?? [])]
                 const mat = insumosMat.find((m) => m.id === e.target.value)
-                lista[idx] = {
-                  ...ins,
-                  materialId: e.target.value,
-                  nome: mat?.nome ?? ins.nome,
-                  custoUnitario: mat ? Number(mat.custoMedioUnitario) : ins.custoUnitario,
+                if (!e.target.value) {
+                  lista[idx] = { ...ins, materialId: '', custoUnitario: 0 }
+                } else {
+                  lista[idx] = {
+                    ...ins,
+                    materialId: e.target.value,
+                    nome: mat?.nome ?? ins.nome,
+                    custoUnitario: custoMedioDoMaterial(mat),
+                  }
                 }
                 onChange({ ...peca, insumos: lista })
               }}

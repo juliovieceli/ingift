@@ -2,6 +2,7 @@ import { selecionarTextoAoFocar } from '@/lib/selecionarAoFocar'
 import { Checkbox } from '@/componentes/ui/Checkbox'
 import { Input } from '@/componentes/ui/Input'
 import { formatarMoeda, calcularCustoAvulso, type AvulsoCalculo } from '@/lib/calculadora'
+import { custoMedioDoMaterial } from '@/lib/estoque'
 import type { Material } from '@/tipos/database'
 import { UNIDADE_FILAMENTO } from '@/lib/unidadesMedida'
 
@@ -19,14 +20,14 @@ export function FormularioItemAvulso({ avulso, onChange, materiais = [] }: Props
   const selecionarMaterial = (materialId: string) => {
     const mat = opcoes.find((m) => m.id === materialId)
     if (!mat) {
-      onChange({ ...avulso, materialId: undefined })
+      onChange({ ...avulso, materialId: undefined, custoUnitario: 0 })
       return
     }
     onChange({
       ...avulso,
       materialId: mat.id,
       nome: mat.nome,
-      custoUnitario: Number(mat.custoMedioUnitario),
+      custoUnitario: custoMedioDoMaterial(mat),
     })
   }
 

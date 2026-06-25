@@ -4,7 +4,11 @@ import { supabase } from '@/lib/supabase'
 import { Botao } from '@/componentes/ui/Botao'
 import { TabelaDados } from '@/componentes/ui/TabelaDados'
 import { ModalPortfolio } from '@/funcionalidades/cms/modais/ModalPortfolio'
-import { ModalSecao, NOMES_SECAO, normalizarSlug, parseConteudo } from '@/funcionalidades/cms/modais/ModalSecao'
+import { ModalSecao } from '@/funcionalidades/cms/modais/ModalSecao'
+import { NOMES_SECAO, normalizarSlug } from '@/funcionalidades/cms/secaoCms'
+import { parseConteudo } from '@/lib/parseConteudo'
+import { parseConteudoServicos } from '@/funcionalidades/landing/conteudoServicos'
+import { parseConteudoMarca } from '@/funcionalidades/landing/conteudoMarca'
 import type { PortfolioItem, SecaoLanding } from '@/tipos/database'
 
 type Aba = 'secoes' | 'portfolio'
@@ -12,12 +16,20 @@ type Aba = 'secoes' | 'portfolio'
 function previewSecao(secao: SecaoLanding): string {
   const c = parseConteudo(secao.conteudo)
   const slug = normalizarSlug(secao.slug)
-  if (slug === 'servicos' && Array.isArray(c.itens)) {
-    return (c.itens as string[]).join(', ')
+  if (slug === 'marca') {
+    const m = parseConteudoMarca(c)
+    return `${m.nomeMarca} — ${m.urlLogo}`
+  }
+  if (slug === 'servicos') {
+    return parseConteudoServicos(c).map((i) => i.titulo).join(', ')
   }
   if (slug === 'sobre' && typeof c.texto === 'string') return c.texto
   if (slug === 'hero') {
-    return [c.titulo, c.subtitulo].filter(Boolean).join(' — ')
+    const frases = Array.isArray(c.frasesRotativas) ? (c.frasesRotativas as string[]).join(' · ') : ''
+    return [c.titulo, frases].filter(Boolean).join(' — ')
+  }
+  if (slug === 'portfolio') {
+    return String(c.subtitulo ?? '')
   }
   if (slug === 'contato') {
     const redes = ['instagram', 'tiktok', 'youtube', 'shopee']

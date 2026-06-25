@@ -102,6 +102,7 @@ export interface Database {
         statusOrcamentoId: string
         configuracaoImpressoraId: string | null
         travado: boolean
+        faturado: boolean
         validoAte: string | null
         prazoEntrega: string | null
         origem: string
@@ -113,6 +114,64 @@ export interface Database {
         atualizadoEm: string
         criadoPor: string | null
         atualizadoPor: string | null
+      }>
+      FinanceiroPlanoConta: Tabela<{
+        id: string
+        codigo: string
+        nome: string
+        tipo: 'receita' | 'despesa'
+        paiId: string | null
+        ordem: number
+        ativo: boolean
+        criadoEm: string
+        criadoPor: string | null
+      }>
+      FinanceiroContaCaixa: Tabela<{
+        id: string
+        nome: string
+        tipo: 'caixa' | 'banco' | 'pix' | 'outro'
+        saldoAtual: number
+        ativo: boolean
+        criadoEm: string
+        criadoPor: string | null
+      }>
+      FinanceiroTitulo: Tabela<{
+        id: string
+        tipo: 'receita' | 'despesa'
+        planoContaId: string
+        valor: number
+        valorBaixado: number
+        status: 'pendente' | 'parcial' | 'quitado'
+        dataEmissao: string
+        dataVencimento: string
+        descricao: string
+        clienteId: string | null
+        orcamentoId: string | null
+        movimentacaoEstoqueId: string | null
+        fornecedor: string | null
+        observacoes: string | null
+        criadoEm: string
+        criadoPor: string | null
+      }>
+      FinanceiroBaixa: Tabela<{
+        id: string
+        tituloId: string
+        contaCaixaId: string
+        valor: number
+        dataBaixa: string
+        observacoes: string | null
+        criadoEm: string
+        criadoPor: string | null
+      }>
+      FinanceiroLogOperacao: Tabela<{
+        id: string
+        operacao: 'estorno_baixa' | 'exclusao_titulo'
+        tituloId: string | null
+        orcamentoId: string | null
+        snapshots: Json
+        motivo: string | null
+        executadoPor: string | null
+        executadoEm: string
       }>
       Material: Tabela<{
         id: string
@@ -234,3 +293,8 @@ export type OrcamentoItem = Database['public']['Tables']['OrcamentoItem']['Row']
 export type OrcamentoItemComposicao = Database['public']['Tables']['OrcamentoItemComposicao']['Row']
 export type OrcamentoHistoricoStatus = Database['public']['Tables']['OrcamentoHistoricoStatus']['Row']
 export type Perfil = Database['public']['Tables']['Perfil']['Row']
+export type FinanceiroPlanoConta = Database['public']['Tables']['FinanceiroPlanoConta']['Row']
+export type FinanceiroContaCaixa = Database['public']['Tables']['FinanceiroContaCaixa']['Row']
+export type FinanceiroTitulo = Database['public']['Tables']['FinanceiroTitulo']['Row']
+export type FinanceiroBaixa = Database['public']['Tables']['FinanceiroBaixa']['Row']
+export type FinanceiroLogOperacao = Database['public']['Tables']['FinanceiroLogOperacao']['Row']

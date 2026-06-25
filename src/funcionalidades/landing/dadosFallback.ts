@@ -1,4 +1,7 @@
 import type { PortfolioItem, SecaoLanding } from '@/tipos/database'
+import { FRASES_ROTATIVAS_PADRAO, HERO_PADRAO } from './conteudoHero'
+import { MARCA_PADRAO } from './conteudoMarca'
+import { SERVICOS_PADRAO } from './conteudoServicos'
 
 const agora = new Date().toISOString()
 
@@ -8,12 +11,28 @@ export const secoesFallback: SecaoLanding[] = [
     slug: 'hero',
     titulo: 'Hero',
     conteudo: {
-      titulo: 'Impressão 3D sob medida',
-      subtitulo: 'Transformamos suas ideias em objetos reais com qualidade e precisão',
-      cta: 'Solicitar orçamento',
+      titulo: HERO_PADRAO.titulo,
+      frasesRotativas: FRASES_ROTATIVAS_PADRAO,
+      subtitulo: HERO_PADRAO.subtitulo,
+      cta: HERO_PADRAO.cta,
+      ctaSecundario: HERO_PADRAO.ctaSecundario,
     },
     publicado: true,
     ordem: 1,
+    atualizadoEm: agora,
+    atualizadoPor: null,
+  },
+  {
+    id: '6',
+    slug: 'marca',
+    titulo: 'Marca / Logo',
+    conteudo: {
+      urlLogo: MARCA_PADRAO.urlLogo,
+      nomeMarca: MARCA_PADRAO.nomeMarca,
+      exibirLogoHero: MARCA_PADRAO.exibirLogoHero,
+    },
+    publicado: true,
+    ordem: 0,
     atualizadoEm: agora,
     atualizadoPor: null,
   },
@@ -22,7 +41,7 @@ export const secoesFallback: SecaoLanding[] = [
     slug: 'servicos',
     titulo: 'Serviços',
     conteudo: {
-      itens: ['Prototipagem', 'Peças funcionais', 'Brindes personalizados', 'Peças sob medida'],
+      itens: SERVICOS_PADRAO,
     },
     publicado: true,
     ordem: 2,
@@ -30,14 +49,26 @@ export const secoesFallback: SecaoLanding[] = [
     atualizadoPor: null,
   },
   {
+    id: '5',
+    slug: 'portfolio',
+    titulo: 'Portfólio',
+    conteudo: {
+      subtitulo: 'Alguns dos nossos trabalhos em impressão 3D',
+    },
+    publicado: true,
+    ordem: 3,
+    atualizadoEm: agora,
+    atualizadoPor: null,
+  },
+  {
     id: '3',
     slug: 'sobre',
-    titulo: 'Sobre',
+    titulo: 'Sobre a InGift',
     conteudo: {
       texto: 'A InGift transforma ideias em objetos com impressão 3D de qualidade.',
     },
     publicado: true,
-    ordem: 3,
+    ordem: 4,
     atualizadoEm: agora,
     atualizadoPor: null,
   },
@@ -55,7 +86,7 @@ export const secoesFallback: SecaoLanding[] = [
       shopee: '',
     },
     publicado: true,
-    ordem: 4,
+    ordem: 5,
     atualizadoEm: agora,
     atualizadoPor: null,
   },

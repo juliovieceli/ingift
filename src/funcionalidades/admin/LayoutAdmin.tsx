@@ -9,6 +9,7 @@ import {
   PenLine,
   Printer,
   Users,
+  Wallet,
 } from 'lucide-react'
 import { useAuth } from '@/contextos/AuthContext'
 import { TemaToggle } from '@/componentes/TemaToggle'
@@ -17,9 +18,10 @@ import { supabaseConfigurado } from '@/lib/supabase'
 const links = [
   { to: '/admin', fim: true, rotulo: 'Dashboard', icone: LayoutDashboard },
   { to: '/admin/clientes', rotulo: 'Clientes', icone: Users },
-  { to: '/admin/orcamentos', rotulo: 'Orçamentos', icone: ClipboardList },
   { to: '/admin/estoque', rotulo: 'Estoque', icone: Package },
+  { to: '/admin/orcamentos', rotulo: 'Orçamentos', icone: ClipboardList },
   { to: '/admin/movimentacoes', rotulo: 'Movimentações', icone: ArrowLeftRight },
+  { to: '/admin/financeiro', rotulo: 'Financeiro', icone: Wallet },
   { to: '/admin/impressoras', rotulo: 'Impressoras', icone: Printer },
   { to: '/admin/cms', rotulo: 'Conteúdo', icone: PenLine },
   { to: '/admin/configuracoes', rotulo: 'Configurações', icone: Cog },
