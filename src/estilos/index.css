@@ -199,13 +199,33 @@ input[type="number"] {
   contain-intrinsic-size: auto 500px;
 }
 
+@keyframes splash-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(0.97); }
+}
+
+@keyframes splash-bar {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+
+.splash-logo {
+  animation: splash-pulse 2s ease-in-out infinite;
+}
+
+.splash-bar {
+  animation: splash-bar 1.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .entrada-hero,
   .texto-rotativo-entra,
   .texto-rotativo-sai,
   .orb-float,
   .orb-float-delay,
-  .indicador-scroll {
+  .indicador-scroll,
+  .splash-logo,
+  .splash-bar {
     animation: none !important;
   }
 

@@ -81,7 +81,7 @@ export function SecaoHero({ hero, marca, whatsapp }: Props) {
             onMouseLeave={onMouseLeaveCta}
           >
             <Botao variante="secundario" className="px-6 py-3 text-base">
-              {hero.cta}aaaa
+              {hero.cta}
             </Botao>
           </a>
           <a

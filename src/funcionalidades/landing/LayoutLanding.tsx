@@ -1,11 +1,17 @@
 import { Link, Outlet } from 'react-router-dom'
 import { TemaToggle } from '@/componentes/TemaToggle'
+import { SplashLanding } from './componentes/SplashLanding'
 import { parseConteudoMarca } from './conteudoMarca'
 import { useLandingDados } from './useLandingDados'
 import { Rodape } from './Rodape'
 
 export function LayoutLanding() {
-  const { secao } = useLandingDados()
+  const { carregando, secao } = useLandingDados()
+
+  if (carregando) {
+    return <SplashLanding />
+  }
+
   const marca = parseConteudoMarca(secao('marca')?.conteudo)
 
   return (
@@ -30,7 +36,7 @@ export function LayoutLanding() {
           </nav>
         </div>
       </header>
-      <main className="flex-1">
+      <main className="entrada-hero flex-1">
         <Outlet />
       </main>
       <Rodape nomeMarca={marca.nomeMarca} />

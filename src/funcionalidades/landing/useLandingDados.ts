@@ -2,10 +2,24 @@ import { buscarDadosLanding } from '@/lib/landingApi'
 import { parseConteudo } from '@/lib/parseConteudo'
 import type { PortfolioItem, SecaoLanding } from '@/tipos/database'
 import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import type { ContatoLanding } from './contatoLanding'
 import { portfolioFallback, secoesFallback } from './dadosFallback'
 
+/** Tempo máximo de splash antes de exibir conteúdo padrão (ms) */
+export const LANDING_TIMEOUT_FALLBACK_MS = 3500
+
 const agora = () => new Date().toISOString()
+
+type DadosLandingNormalizados = {
+  secoes: SecaoLanding[]
+  portfolio: PortfolioItem[]
+}
+
+const dadosFallbackNormalizados: DadosLandingNormalizados = {
+  secoes: secoesFallback,
+  portfolio: portfolioFallback,
+}
 
 function normalizarSecoes(
   secoes: { slug: string; titulo: string; conteudo: SecaoLanding['conteudo']; ordem: number }[],
@@ -41,15 +55,16 @@ function normalizarPortfolio(
 }
 
 export function useLandingDados() {
+  const [timeoutFallback, setTimeoutFallback] = useState(false)
+
   const landing = useQuery({
     queryKey: ['landing'],
-    queryFn: async () => {
+    queryFn: async (): Promise<DadosLandingNormalizados> => {
       const dados = await buscarDadosLanding()
       if (!dados?.secoes.length) {
-        return { secoes: secoesFallback, portfolio: portfolioFallback }
+        return dadosFallbackNormalizados
       }
 
-      console.log({secoes: dados.secoes})
       return {
         secoes: normalizarSecoes(dados.secoes),
         portfolio: dados.portfolio.length
@@ -59,8 +74,21 @@ export function useLandingDados() {
     },
   })
 
-  const secao = (slug: string) => landing.data?.secoes.find((s) => s.slug === slug)
+  useEffect(() => {
+    if (landing.isSuccess) return
+    const id = window.setTimeout(() => setTimeoutFallback(true), LANDING_TIMEOUT_FALLBACK_MS)
+    return () => window.clearTimeout(id)
+  }, [landing.isSuccess])
 
+  const carregando = landing.isPending && !timeoutFallback
+
+  const dados: DadosLandingNormalizados | undefined = landing.isSuccess
+    ? landing.data
+    : timeoutFallback
+      ? dadosFallbackNormalizados
+      : undefined
+
+  const secao = (slug: string) => dados?.secoes.find((s) => s.slug === slug)
 
   const contato = (): ContatoLanding | undefined => {
     const raw = secao('contato')?.conteudo
@@ -69,8 +97,9 @@ export function useLandingDados() {
   }
 
   return {
-    secoes: { data: landing.data?.secoes, isLoading: landing.isLoading },
-    portfolio: { data: landing.data?.portfolio, isLoading: landing.isLoading },
+    carregando,
+    secoes: { data: dados?.secoes, isLoading: carregando },
+    portfolio: { data: dados?.portfolio, isLoading: carregando },
     secao,
     contato,
   }
