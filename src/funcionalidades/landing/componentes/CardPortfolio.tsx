@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
 import { Botao } from '@/componentes/ui/Botao'
 import { ModalDetalhePortfolio } from '@/funcionalidades/landing/componentes/ModalDetalhePortfolio'
 import type { PortfolioItem } from '@/tipos/database'
+import { useEffect, useRef, useState } from 'react'
 
 interface Props {
   item: PortfolioItem
@@ -45,11 +45,11 @@ export function CardPortfolio({ item, idx = 0, hoverCapaz = false, className = '
           )}
         </div>
         <figcaption className="flex flex-1 flex-col p-3">
-          {item.grupo && (
+      {/*     {item.grupo && (
             <span className="mb-1 w-fit rounded-full bg-[var(--superficie-elevada)] px-2 py-0.5 text-xs text-[var(--texto-muted)]">
               {item.grupo}
             </span>
-          )}
+          )} */}
           <p className="font-medium text-[var(--texto)]">{item.titulo}</p>
           {item.descricao && (
             <button
