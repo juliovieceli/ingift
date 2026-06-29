@@ -58,6 +58,8 @@ export function PaginaMovimentacoes() {
       </div>
 
       <TabelaDados
+        idTabela="movimentacoes-estoque"
+        colunasPadraoMobile={['criadoEm', 'material', 'tipo', 'quantidade']}
         colunas={[
           { id: 'criadoEm', rotulo: 'Data', ordenavel: true, render: (m) => new Date(m.criadoEm).toLocaleDateString('pt-BR') },
           { id: 'material', rotulo: 'Material', render: (m) => m.Material?.nome ?? '—' },

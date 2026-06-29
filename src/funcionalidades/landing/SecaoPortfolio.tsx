@@ -1,6 +1,11 @@
-import { useScrollReveal } from '@/hooks/useScrollReveal'
+import { Botao } from '@/componentes/ui/Botao'
+import { CardPortfolio } from '@/funcionalidades/landing/componentes/CardPortfolio'
 import { usePrefersMotion } from '@/hooks/usePrefersMotion'
+import { useScrollReveal } from '@/hooks/useScrollReveal'
 import type { PortfolioItem } from '@/tipos/database'
+import { Link } from 'react-router-dom'
+
+const MAX_DESTAQUES = 4
 
 interface Props {
   titulo: string
@@ -11,6 +16,8 @@ interface Props {
 export function SecaoPortfolio({ titulo, subtitulo, itens }: Props) {
   const { ref, className } = useScrollReveal()
   const { hoverCapaz } = usePrefersMotion()
+  const destaques = itens.slice(0, MAX_DESTAQUES)
+  const temMais = itens.length > MAX_DESTAQUES
 
   return (
     <section id="portfolio" ref={ref} className={`secao-lazy bg-[var(--superficie)] px-4 py-16 ${className}`}>
@@ -19,34 +26,20 @@ export function SecaoPortfolio({ titulo, subtitulo, itens }: Props) {
         {subtitulo && (
           <p className="mx-auto mt-3 max-w-xl text-center text-[var(--texto-secundario)]">{subtitulo}</p>
         )}
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {itens.map((item, idx) => (
-            <figure
-              key={item.id}
-              className="group overflow-hidden rounded-xl border border-[var(--borda)]"
-              style={{ transitionDelay: `${idx * 80}ms` }}
-            >
-              <div className="relative aspect-square overflow-hidden">
-                <img
-                  src={item.urlImagem}
-                  alt={item.titulo}
-                  loading="lazy"
-                  decoding="async"
-                  className={`h-full w-full object-cover transition duration-500 ${hoverCapaz ? 'group-hover:scale-105' : ''}`}
-                />
-                {hoverCapaz && (
-                  <div className="absolute inset-0 bg-gradient-to-t from-primary-950/80 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                )}
-              </div>
-              <figcaption className="p-3">
-                <p className="font-medium text-[var(--texto)]">{item.titulo}</p>
-                {item.descricao && (
-                  <p className="text-sm text-[var(--texto-muted)]">{item.descricao}</p>
-                )}
-              </figcaption>
-            </figure>
+        <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {destaques.map((item, idx) => (
+            <CardPortfolio key={item.id} item={item} idx={idx} hoverCapaz={hoverCapaz} />
           ))}
         </div>
+        {temMais && (
+          <div className="mt-8 flex justify-center">
+            <Link to="/portfolio">
+              <Botao variante="fantasma">
+                Ver catálogo completo
+              </Botao>
+            </Link>
+          </div>
+        )}
       </div>
     </section>
   )

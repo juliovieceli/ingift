@@ -318,7 +318,7 @@ export function PaginaDetalheOrcamento() {
       </Link>
 
       <Card className="p-0">
-        <div className="flex flex-wrap items-start justify-between gap-6 p-5">
+        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <div className="min-w-0 space-y-3">
             <div>
               <p className="text-xs font-medium uppercase tracking-wider text-[var(--texto-muted)]">
@@ -349,8 +349,8 @@ export function PaginaDetalheOrcamento() {
             )}
           </div>
 
-          <div className="flex flex-col items-end gap-2">
-            <div className="rounded-xl bg-sucesso/10 px-5 py-3 text-right">
+          <div className="flex flex-col items-start gap-2 sm:items-end">
+            <div className="w-full rounded-xl bg-sucesso/10 px-5 py-3 text-left sm:w-auto sm:text-right">
               <p className="text-xs font-medium uppercase tracking-wider text-sucesso/80">Valor total</p>
               <p className="text-3xl font-bold tabular-nums text-sucesso">
                 {formatarMoeda(valorTotal)}
@@ -369,7 +369,7 @@ export function PaginaDetalheOrcamento() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-[var(--borda)] bg-[var(--fundo)]/50 px-5 py-2.5">
+        <div className="flex flex-col gap-2 border-t border-[var(--borda)] bg-[var(--fundo)]/50 px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-5 sm:gap-y-2 sm:py-2.5">
           <button
             type="button"
             onClick={() => setModalHistorico(true)}
@@ -439,7 +439,7 @@ export function PaginaDetalheOrcamento() {
       </Card>
 
       <Card className="p-0">
-        <div className="flex items-center justify-between gap-4 border-b border-[var(--borda)] px-5 py-4">
+        <div className="flex flex-col gap-3 border-b border-[var(--borda)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-wider text-secondary-500">
               Itens do orçamento
@@ -451,9 +451,9 @@ export function PaginaDetalheOrcamento() {
             )}
           </div>
           {!bloqueado && (
-            <div className="flex flex-wrap gap-2">
-              <Botao onClick={() => abrirModal('peca')}>Adicionar peça</Botao>
-              <Botao variante="fantasma" onClick={() => abrirModal('avulso')}>Adicionar material</Botao>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <Botao className="w-full sm:w-auto" onClick={() => abrirModal('peca')}>Adicionar peça</Botao>
+              <Botao className="w-full sm:w-auto" variante="fantasma" onClick={() => abrirModal('avulso')}>Adicionar material</Botao>
             </div>
           )}
         </div>
@@ -477,7 +477,7 @@ export function PaginaDetalheOrcamento() {
                 return (
                   <div key={item.id}>
                     <div
-                      className={`flex cursor-pointer items-center gap-3 px-5 py-3 transition hover:bg-[var(--fundo)]/50 ${!bloqueado ? '' : 'cursor-default'}`}
+                      className={`flex cursor-pointer flex-wrap items-center gap-3 px-4 py-3 transition hover:bg-[var(--fundo)]/50 sm:px-5 ${!bloqueado ? '' : 'cursor-default'}`}
                       onClick={() => !bloqueado && abrirItem(item)}
                       onKeyDown={() => {}}
                       role="button"
@@ -507,15 +507,15 @@ export function PaginaDetalheOrcamento() {
                           </p>
                         )}
                       </div>
-                      <span className="tabular-nums text-sucesso font-medium">
+                      <span className="w-full shrink-0 tabular-nums font-medium text-sucesso sm:ml-auto sm:w-auto">
                         {formatarMoeda(Number(item.precoFinal ?? item.precoTotal))}
                       </span>
                       {!bloqueado && (
-                        <div className="flex items-center gap-1">
+                        <div className="flex w-full items-center justify-end gap-1 sm:w-auto">
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); abrirItem(item) }}
-                            className="rounded p-1 text-[var(--texto-muted)] hover:bg-[var(--superficie-elevada)]"
+                            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[var(--texto-muted)] hover:bg-[var(--superficie-elevada)]"
                             aria-label="Editar"
                           >
                             <Pencil className="h-4 w-4" />
@@ -523,7 +523,7 @@ export function PaginaDetalheOrcamento() {
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); excluirItem.mutate(item.id) }}
-                            className="rounded p-1 text-erro hover:bg-erro/10"
+                            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-erro hover:bg-erro/10"
                             aria-label="Excluir"
                           >
                             <Trash2 className="h-4 w-4" />

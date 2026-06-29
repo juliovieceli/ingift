@@ -37,7 +37,7 @@ function normalizarSecoes(
 }
 
 function normalizarPortfolio(
-  itens: { id: string; titulo: string; descricao: string | null; urlImagem: string; ordem: number }[],
+  itens: { id: string; titulo: string; descricao: string | null; urlImagem: string; urlLoja: string | null; grupo: string | null; ordem: number }[],
 ): PortfolioItem[] {
   const ts = agora()
   return itens.map((p) => ({
@@ -45,6 +45,8 @@ function normalizarPortfolio(
     titulo: p.titulo,
     descricao: p.descricao,
     urlImagem: p.urlImagem,
+    urlLoja: p.urlLoja,
+    grupo: p.grupo,
     publicado: true,
     ordem: p.ordem,
     criadoEm: ts,

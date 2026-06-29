@@ -93,8 +93,8 @@ export const secoesFallback: SecaoLanding[] = [
 ]
 
 export const portfolioFallback: PortfolioItem[] = [
-  { id: '1', titulo: 'Porta-lata Monster', descricao: 'Peça personalizada', urlImagem: '/imagens/portfolio-porta-lata.jpg', publicado: true, ordem: 1, criadoEm: agora, atualizadoEm: agora, criadoPor: null, atualizadoPor: null },
-  { id: '2', titulo: 'Produto 01', descricao: 'Impressão 3D', urlImagem: '/imagens/portfolio-01.jpg', publicado: true, ordem: 2, criadoEm: agora, atualizadoEm: agora, criadoPor: null, atualizadoPor: null },
-  { id: '3', titulo: 'Produto 02', descricao: 'Prototipagem', urlImagem: '/imagens/portfolio-02.jpg', publicado: true, ordem: 3, criadoEm: agora, atualizadoEm: agora, criadoPor: null, atualizadoPor: null },
-  { id: '4', titulo: 'Produto 03', descricao: 'Peça decorativa', urlImagem: '/imagens/portfolio-03.png', publicado: true, ordem: 4, criadoEm: agora, atualizadoEm: agora, criadoPor: null, atualizadoPor: null },
+  { id: '1', titulo: 'Porta-lata Monster', descricao: 'Peça personalizada', urlImagem: '/imagens/portfolio-porta-lata.jpg', urlLoja: null, grupo: 'Brindes', publicado: true, ordem: 1, criadoEm: agora, atualizadoEm: agora, criadoPor: null, atualizadoPor: null },
+  { id: '2', titulo: 'Produto 01', descricao: 'Impressão 3D', urlImagem: '/imagens/portfolio-01.jpg', urlLoja: null, grupo: 'Funcional', publicado: true, ordem: 2, criadoEm: agora, atualizadoEm: agora, criadoPor: null, atualizadoPor: null },
+  { id: '3', titulo: 'Produto 02', descricao: 'Prototipagem', urlImagem: '/imagens/portfolio-02.jpg', urlLoja: null, grupo: 'Funcional', publicado: true, ordem: 3, criadoEm: agora, atualizadoEm: agora, criadoPor: null, atualizadoPor: null },
+  { id: '4', titulo: 'Produto 03', descricao: 'Peça decorativa', urlImagem: '/imagens/portfolio-03.png', urlLoja: null, grupo: 'Decorativo', publicado: true, ordem: 4, criadoEm: agora, atualizadoEm: agora, criadoPor: null, atualizadoPor: null },
 ]

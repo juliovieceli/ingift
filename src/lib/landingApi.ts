@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 
 export interface DadosLanding {
   secoes: Pick<SecaoLanding, 'slug' | 'titulo' | 'conteudo' | 'ordem'>[]
-  portfolio: Pick<PortfolioItem, 'id' | 'titulo' | 'descricao' | 'urlImagem' | 'ordem'>[]
+  portfolio: Pick<PortfolioItem, 'id' | 'titulo' | 'descricao' | 'urlImagem' | 'urlLoja' | 'grupo' | 'ordem'>[]
 }
 
 function urlLandingApi(): string | null {
@@ -36,7 +36,7 @@ async function buscarViaSupabase(): Promise<DadosLanding | null> {
 
   const [secoesRes, portfolioRes] = await Promise.all([
     supabase.from('SecaoLandingPublica').select('slug, titulo, conteudo, ordem').order('ordem'),
-    supabase.from('PortfolioItemPublico').select('id, titulo, descricao, urlImagem, ordem').order('ordem'),
+    supabase.from('PortfolioItemPublico').select('id, titulo, descricao, urlImagem, urlLoja, grupo, ordem').order('ordem'),
   ])
 
   if (secoesRes.error || portfolioRes.error) return null

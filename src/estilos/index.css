@@ -44,6 +44,9 @@
   --primaria-fg: #ffffff;
   --secundaria: #351f52;
   --secundaria-fg: #ffffff;
+  --scrollbar-track: #e0f2f2;
+  --scrollbar-thumb: #3cbdbd;
+  --scrollbar-thumb-hover: #2e9a9a;
 }
 
 .dark {
@@ -58,6 +61,9 @@
   --primaria-fg: #ffffff;
   --secundaria: #8f7aa8;
   --secundaria-fg: #ffffff;
+  --scrollbar-track: #3f3f46;
+  --scrollbar-thumb: #3cbdbd;
+  --scrollbar-thumb-hover: #4dcaca;
 }
 
 body {
@@ -65,6 +71,37 @@ body {
   color: var(--texto);
   font-family: system-ui, -apple-system, sans-serif;
   min-height: 100vh;
+}
+
+/* Scrollbar global — Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* Scrollbar global — Chrome, Safari, Edge */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 9999px;
+  border: 2px solid var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
 }
 
 dialog {

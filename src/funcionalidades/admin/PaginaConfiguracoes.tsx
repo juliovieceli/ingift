@@ -71,6 +71,8 @@ export function PaginaConfiguracoes() {
         </div>
 
         <TabelaDados
+          idTabela="config-status-orcamento"
+          colunasPadraoMobile={['ordem', 'nome', 'ativo', 'acoes']}
           colunas={[
             { id: 'ordem', rotulo: 'Ordem', ordenavel: true },
             { id: 'nome', rotulo: 'Nome', ordenavel: true },

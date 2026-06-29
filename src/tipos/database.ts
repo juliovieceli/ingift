@@ -88,6 +88,8 @@ export interface Database {
         titulo: string
         descricao: string | null
         urlImagem: string
+        urlLoja: string | null
+        grupo: string | null
         publicado: boolean
         ordem: number
         criadoEm: string

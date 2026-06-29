@@ -94,7 +94,7 @@ function FormularioBaixaTitulo({ titulo, onFechar, onSalvo }: FormProps) {
           </select>
         </label>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input
             rotulo="Valor (R$)"
             type="number"
@@ -122,7 +122,7 @@ function FormularioBaixaTitulo({ titulo, onFechar, onSalvo }: FormProps) {
 
         {erro && <p className="text-sm text-erro">{erro}</p>}
 
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
           <Botao type="button" variante="fantasma" onClick={onFechar}>
             Cancelar
           </Botao>

@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { LayoutLanding } from '@/funcionalidades/landing/LayoutLanding'
 import { PaginaInicial } from '@/funcionalidades/landing/PaginaInicial'
+import { PaginaPortfolio } from '@/funcionalidades/landing/PaginaPortfolio'
 
 const LayoutAuth = lazy(() =>
   import('@/funcionalidades/admin/LayoutAuth').then((m) => ({ default: m.LayoutAuth }))
@@ -61,6 +62,7 @@ export default function App() {
         <Routes>
           <Route element={<LayoutLanding />}>
             <Route index element={<PaginaInicial />} />
+            <Route path="portfolio" element={<PaginaPortfolio />} />
           </Route>
           <Route
             element={

@@ -44,8 +44,10 @@ export function PaginaImpressoras() {
 
       <div className="mt-6">
         <TabelaDados
+          idTabela="impressoras-lista"
+          colunasPadraoMobile={['nome', 'modelo', 'ativo', 'acoes']}
           colunas={[
-            { id: 'nome', rotulo: 'Nome', ordenavel: true },
+            { id: 'nome', rotulo: 'Nome', ordenavel: true, obrigatoria: true },
             { id: 'modelo', rotulo: 'Modelo', render: (i) => i.modelo ?? '—' },
             {
               id: 'margemMultiplicador',

@@ -84,11 +84,38 @@ export function PaginaOrcamentos() {
     navigate(`/admin/orcamentos/${o.id}`)
   }, [navigate])
 
+  const renderCardOrcamento = useCallback((o: OrcamentoLista) => (
+    <button
+      type="button"
+      onClick={() => irDetalhe(o)}
+      className="w-full rounded-xl border border-[var(--borda)] bg-[var(--superficie)] p-4 text-left transition hover:bg-[var(--superficie-elevada)]/50"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs text-[var(--texto-muted)]">#{o.numeroSequencial}</p>
+          <p className="font-medium text-[var(--texto)]">{o.Cliente?.nome ?? '—'}</p>
+        </div>
+        <span className="shrink-0 rounded-full bg-secondary-500/15 px-2 py-0.5 text-xs text-secondary-700 dark:text-secondary-300">
+          {o.OrcamentoStatus?.nome ?? '—'}
+        </span>
+      </div>
+      <div className="mt-3 flex items-end justify-between gap-2">
+        <div className="text-sm text-[var(--texto-muted)]">
+          <p>{new Date(o.criadoEm).toLocaleDateString('pt-BR')}</p>
+          {o.validoAte && (
+            <p className="text-xs">Válido até {new Date(o.validoAte).toLocaleDateString('pt-BR')}</p>
+          )}
+        </div>
+        <p className="text-lg font-bold text-sucesso">{formatarMoeda(Number(o.precoTotal))}</p>
+      </div>
+    </button>
+  ), [irDetalhe])
+
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-[var(--texto)]">Orçamentos</h2>
-        <Botao onClick={() => { setErro(''); setModalNovo(true) }}>Novo orçamento</Botao>
+        <Botao className="w-full sm:w-auto" onClick={() => { setErro(''); setModalNovo(true) }}>Novo orçamento</Botao>
       </div>
 
       <div className="mt-4">
@@ -101,9 +128,12 @@ export function PaginaOrcamentos() {
 
       <div className="mt-6">
         <TabelaDados
+          idTabela="orcamentos-lista"
+          colunasPadraoMobile={['numeroSequencial', 'cliente', 'precoTotal', 'status', 'acoes']}
+          renderCard={renderCardOrcamento}
           colunas={[
-            { id: 'numeroSequencial', rotulo: '#', ordenavel: true, render: (o) => `#${o.numeroSequencial}` },
-            { id: 'cliente', rotulo: 'Cliente', ordenavel: true, render: (o) => o.Cliente?.nome ?? '—' },
+            { id: 'numeroSequencial', rotulo: '#', ordenavel: true, obrigatoria: true, render: (o) => `#${o.numeroSequencial}` },
+            { id: 'cliente', rotulo: 'Cliente', ordenavel: true, obrigatoria: true, render: (o) => o.Cliente?.nome ?? '—' },
             {
               id: 'status',
               rotulo: 'Status',
@@ -133,11 +163,14 @@ export function PaginaOrcamentos() {
             {
               id: 'acoes',
               rotulo: '',
+              obrigatoria: true,
+              ocultavel: false,
+              exibirNoCard: false,
               render: (o) => (
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); irDetalhe(o) }}
-                  className="text-sm text-secondary-600 hover:underline"
+                  className="inline-flex min-h-8 items-center text-sm text-secondary-600 hover:underline"
                 >
                   Abrir
                 </button>
@@ -175,7 +208,7 @@ export function PaginaOrcamentos() {
             </select>
           </label>
           {erro && <p className="text-sm text-erro">{erro}</p>}
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Botao type="button" variante="fantasma" onClick={() => setModalNovo(false)}>Cancelar</Botao>
             <Botao type="button" onClick={() => criar.mutate()} disabled={criar.isPending || !clienteId}>
               {criar.isPending ? 'Criando...' : 'Criar orçamento'}

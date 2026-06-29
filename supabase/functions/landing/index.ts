@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
         .order('ordem'),
       supabase
         .from('PortfolioItem')
-        .select('id, titulo, descricao, urlImagem, ordem')
+        .select('id, titulo, descricao, urlImagem, urlLoja, grupo, ordem')
         .eq('publicado', true)
         .order('ordem'),
     ])

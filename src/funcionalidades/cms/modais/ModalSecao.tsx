@@ -1,7 +1,9 @@
 import { Botao } from '@/componentes/ui/Botao'
+import { CampoImagemCms } from '@/componentes/ui/CampoImagemCms'
 import { Checkbox } from '@/componentes/ui/Checkbox'
 import { Input } from '@/componentes/ui/Input'
 import { Modal } from '@/componentes/ui/Modal'
+import { extrairCaminhoStorage, removerImagemCms } from '@/lib/storageImagem'
 import { CamposContatoCms } from '@/funcionalidades/cms/CamposContatoCms'
 import { carregarCamposContato, montarConteudoContato } from '@/funcionalidades/cms/contatoCms'
 import { normalizarSlug, nomeSecaoCms } from '@/funcionalidades/cms/secaoCms'
@@ -18,7 +20,7 @@ import { selecionarTextoAoFocar } from '@/lib/selecionarAoFocar'
 import { supabase } from '@/lib/supabase'
 import type { SecaoLanding } from '@/tipos/database'
 import { useMutation } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 interface Props {
   aberto: boolean
@@ -176,18 +178,13 @@ function CamposSecao({
   if (slugNorm === 'marca') {
     return (
       <div className="grid gap-3">
-        {campos.urlLogo && (
-          <img src={campos.urlLogo} alt={campos.nomeMarca || 'Logo'} className="mx-auto h-16 w-auto rounded-lg bg-[var(--superficie-elevada)] p-2" />
-        )}
-        <Input
-          rotulo="URL da logo"
-          value={campos.urlLogo ?? ''}
-          onChange={(e) => atualizar('urlLogo', e.target.value)}
-          placeholder="/marca/sublogo.png"
+        <CampoImagemCms
+          valor={campos.urlLogo ?? ''}
+          onChange={(v) => atualizar('urlLogo', v)}
+          preset="logo"
+          rotulo="Logo"
+          obrigatorio
         />
-        <p className="text-xs text-[var(--texto-muted)]">
-          Coloque o arquivo em <code className="rounded bg-[var(--superficie-elevada)] px-1">public/marca/</code> ou use uma URL externa.
-        </p>
         <Input rotulo="Nome da marca" value={campos.nomeMarca ?? ''} onChange={(e) => atualizar('nomeMarca', e.target.value)} />
         <Checkbox
           rotulo="Exibir logo também no centro do hero"
@@ -271,10 +268,18 @@ function FormularioSecao({
   const [publicado, setPublicado] = useState(secao.publicado)
   const [campos, setCampos] = useState(() => carregarCampos(secao.slug, secao.conteudo))
   const [erro, setErro] = useState('')
+  const urlLogoInicial = useRef(
+    normalizarSlug(secao.slug) === 'marca'
+      ? String(carregarCampos(secao.slug, secao.conteudo).urlLogo ?? '')
+      : '',
+  )
 
   const salvar = useMutation({
     mutationFn: async () => {
       if (!supabase) throw new Error('Supabase não configurado')
+      if (normalizarSlug(secao.slug) === 'marca' && !campos.urlLogo) {
+        throw new Error('Selecione uma logo')
+      }
       const novoConteudo = montarConteudo(secao.slug, campos)
       const { data, error } = await supabase
         .from('SecaoLanding')
@@ -283,6 +288,15 @@ function FormularioSecao({
         .select('id')
       if (error) throw error
       if (!data?.length) throw new Error('Sem permissão para salvar ou seção não encontrada.')
+
+      if (
+        normalizarSlug(secao.slug) === 'marca' &&
+        urlLogoInicial.current &&
+        campos.urlLogo !== urlLogoInicial.current &&
+        extrairCaminhoStorage(urlLogoInicial.current)
+      ) {
+        await removerImagemCms(urlLogoInicial.current)
+      }
     },
     onSuccess: () => { onSalvo(); onFechar() },
     onError: (e) => setErro(e instanceof Error ? e.message : 'Erro ao salvar'),

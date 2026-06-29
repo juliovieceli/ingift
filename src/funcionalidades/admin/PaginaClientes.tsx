@@ -35,8 +35,10 @@ export function PaginaClientes() {
 
       <div className="mt-6">
         <TabelaDados
+          idTabela="clientes-lista"
+          colunasPadraoMobile={['nome', 'telefone', 'ativo', 'acoes']}
           colunas={[
-            { id: 'nome', rotulo: 'Nome', ordenavel: true },
+            { id: 'nome', rotulo: 'Nome', ordenavel: true, obrigatoria: true },
             { id: 'telefone', rotulo: 'Telefone', render: (c) => c.telefone ?? '—' },
             { id: 'email', rotulo: 'E-mail', render: (c) => c.email ?? '—' },
             { id: 'documento', rotulo: 'Documento', render: (c) => c.documento ?? '—' },

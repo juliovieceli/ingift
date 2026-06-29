@@ -77,6 +77,7 @@ export function PaginaCms() {
   const invalidar = () => {
     qc.invalidateQueries({ queryKey: ['cms-secoes'] })
     qc.invalidateQueries({ queryKey: ['cms-portfolio'] })
+    qc.invalidateQueries({ queryKey: ['cms-portfolio-grupos'] })
     qc.invalidateQueries({ queryKey: ['landing'] })
   }
 
@@ -114,8 +115,10 @@ export function PaginaCms() {
             </p>
           )}
           <TabelaDados
+            idTabela="cms-secoes"
+            colunasPadraoMobile={['nome', 'publicado', 'acoes']}
             colunas={[
-              { id: 'nome', rotulo: 'Seção' },
+              { id: 'nome', rotulo: 'Seção', obrigatoria: true },
               { id: 'slug', rotulo: 'Slug', render: (s) => <span className="font-mono text-xs">{s.slug}</span> },
               {
                 id: 'publicado',
@@ -173,16 +176,18 @@ export function PaginaCms() {
                 key={item.id}
                 type="button"
                 onClick={() => setModalPortfolio({ aberto: true, item })}
-                className="overflow-hidden rounded-xl border border-[var(--borda)] bg-[var(--superficie)] text-left transition hover:border-secondary-500/50"
+                className="flex h-full flex-col overflow-hidden rounded-xl border border-[var(--borda)] bg-[var(--superficie)] text-left transition hover:border-secondary-500/50"
               >
                 <img
                   src={item.urlImagem}
                   alt={item.titulo}
-                  className="aspect-video w-full object-cover"
+                  className="aspect-video w-full shrink-0 object-cover"
                 />
-                <div className="p-3">
+                <div className="flex flex-1 flex-col p-3">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-[var(--texto)]">{item.titulo}</h3>
+                    <h3 className="line-clamp-2 min-h-11 flex-1 font-semibold leading-snug text-[var(--texto)]">
+                      {item.titulo}
+                    </h3>
                     <span
                       className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
                         item.publicado
@@ -193,7 +198,7 @@ export function PaginaCms() {
                       {item.publicado ? 'Publicado' : 'Rascunho'}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-[var(--texto-muted)]">Ordem: {item.ordem}</p>
+                  <p className="mt-auto pt-2 text-xs text-[var(--texto-muted)]">Ordem: {item.ordem}</p>
                 </div>
               </button>
             ))}

@@ -206,6 +206,8 @@ export function ModalMaterial({ aberto, material, onFechar, onSalvo }: Props) {
               Registrar movimentação →
             </Link>
             <TabelaDados
+              idTabela="material-movimentacoes"
+              colunasPadraoMobile={['criadoEm', 'tipo', 'quantidade']}
               colunas={[
                 { id: 'criadoEm', rotulo: 'Data', render: (m) => new Date(m.criadoEm).toLocaleDateString('pt-BR') },
                 { id: 'tipo', rotulo: 'Tipo', render: (m) => m.EstoqueTipoMovimentacao?.nome ?? '—' },

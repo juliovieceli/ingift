@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Wallet, ArrowDownCircle, ArrowUpCircle, FileText, TrendingUp, Building2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -13,7 +13,10 @@ import {
   type LinhaFluxo,
 } from '@/lib/financeiro'
 import { useOrdenacaoPaginacao } from '@/hooks/useOrdenacaoPaginacao'
+import { usePesquisa } from '@/hooks/usePesquisa'
+import { useBreakpoint } from '@/hooks/useBreakpoint'
 import { Botao } from '@/componentes/ui/Botao'
+import { CampoPesquisa } from '@/componentes/ui/CampoPesquisa'
 import { Card } from '@/componentes/ui/Card'
 import { TabelaDados } from '@/componentes/ui/TabelaDados'
 import { Modal } from '@/componentes/ui/Modal'
@@ -36,6 +39,7 @@ type FiltroTipo = 'todos' | 'receita' | 'despesa'
 
 export function PaginaFinanceiro() {
   const qc = useQueryClient()
+  const { ehMobile } = useBreakpoint()
   const [aba, setAba] = useState<Aba>('titulos')
 
   // filtros da aba títulos
@@ -169,18 +173,132 @@ export function PaginaFinanceiro() {
     onError: (e) => setErroGlobal(e instanceof Error ? e.message : 'Erro ao estornar'),
   })
 
-  // ── Tabela de títulos ────────────────────────────────────────
-
-  const tabelaTitulos = useOrdenacaoPaginacao(titulos.data ?? [], 'dataVencimento', 'asc')
-  const tabelaPlano = useOrdenacaoPaginacao(planoContas.data ?? [], 'tipo', 'asc')
-  const tabelaContas = useOrdenacaoPaginacao(contasCaixa.data ?? [], 'nome', 'asc')
-
   function origemTitulo(t: TituloComRelacoes): string {
     if (t.Orcamento) return `Orçamento #${t.Orcamento.numeroSequencial}`
     if (t.movimentacaoEstoqueId) return 'Compra estoque'
     return 'Manual'
   }
 
+  const extrairTextoTitulo = useCallback((t: TituloComRelacoes) => {
+    return [
+      t.descricao,
+      t.FinanceiroPlanoConta?.nome ?? '',
+      t.Cliente?.nome ?? '',
+      t.Orcamento ? `#${t.Orcamento.numeroSequencial}` : '',
+      t.tipo,
+      rotuloStatusTitulo(t.status),
+    ].join(' ')
+  }, [])
+
+  const { termo, setTermo, filtrados: titulosFiltrados } = usePesquisa(
+    titulos.data ?? [],
+    extrairTextoTitulo,
+    200,
+  )
+
+  const tabelaTitulos = useOrdenacaoPaginacao(titulosFiltrados, 'dataVencimento', 'asc')
+  const tabelaPlano = useOrdenacaoPaginacao(planoContas.data ?? [], 'tipo', 'asc')
+  const tabelaContas = useOrdenacaoPaginacao(contasCaixa.data ?? [], 'nome', 'asc')
+
+  function renderAcoesTitulo(t: TituloComRelacoes, mobile = false) {
+    const btnClass = mobile
+      ? 'inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[var(--borda)] px-3 py-2 text-sm'
+      : 'inline-flex min-h-8 items-center gap-1 text-xs'
+
+    return (
+      <div className={`flex flex-wrap items-center gap-2 ${mobile ? 'w-full' : ''}`}>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setModalBaixasLista({ aberto: true, titulo: t }) }}
+          className={`${btnClass} text-[var(--texto-muted)] hover:bg-[var(--superficie-elevada)] hover:text-[var(--texto)]`}
+          title="Ver baixas"
+        >
+          <FileText className="h-4 w-4" />
+          {mobile && <span>Baixas</span>}
+        </button>
+        {t.status !== 'quitado' && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setModalBaixa({ aberto: true, titulo: t })
+            }}
+            className={`${btnClass} text-[var(--primaria)] hover:bg-[var(--primaria)]/10 ${!mobile ? 'hover:underline' : ''}`}
+          >
+            Baixar
+          </button>
+        )}
+        {!t.orcamentoId && t.valorBaixado === 0 && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setErroGlobal('')
+              setMotivoExclusao('')
+              setConfirmExclusao(t)
+            }}
+            className={`${btnClass} text-erro hover:bg-erro/10 ${!mobile ? 'hover:underline' : ''}`}
+          >
+            Excluir
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  function renderCardTitulo(t: TituloComRelacoes) {
+    const hoje = new Date().toISOString().slice(0, 10)
+    const vencido = t.status !== 'quitado' && t.dataVencimento < hoje
+
+    return (
+      <div className="rounded-xl border border-[var(--borda)] bg-[var(--superficie)] p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-[var(--texto)]">{t.descricao}</p>
+            <p className="text-xs text-[var(--texto-muted)]">{origemTitulo(t)}</p>
+          </div>
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+              t.tipo === 'receita' ? 'bg-sucesso/10 text-sucesso' : 'bg-erro/10 text-erro'
+            }`}>
+              {t.tipo === 'receita' ? 'Receita' : 'Despesa'}
+            </span>
+            <span
+              className="rounded-full px-2 py-0.5 text-xs font-medium"
+              style={{ backgroundColor: `${corStatusTitulo(t.status)}22`, color: corStatusTitulo(t.status) }}
+            >
+              {rotuloStatusTitulo(t.status)}
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+          <div>
+            <p className="text-xs text-[var(--texto-muted)]">Valor</p>
+            <p className="font-semibold text-[var(--texto)]">{formatarMoeda(t.valor)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[var(--texto-muted)]">Vencimento</p>
+            <p className={vencido ? 'font-medium text-erro' : 'text-[var(--texto)]'}>
+              {new Date(t.dataVencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-[var(--texto-muted)]">Conta</p>
+            <p className="text-[var(--texto-secundario)]">{t.FinanceiroPlanoConta?.nome ?? '—'}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[var(--texto-muted)]">Recebido/Pago</p>
+            <p className={t.valorBaixado > 0 ? 'text-sucesso' : 'text-[var(--texto-secundario)]'}>
+              {formatarMoeda(t.valorBaixado)}
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 border-t border-[var(--borda)] pt-3">
+          {renderAcoesTitulo(t, true)}
+        </div>
+      </div>
+    )
+  }
   // ── Totais rápidos ────────────────────────────────────────────
 
   const totalReceitas = (titulos.data ?? [])
@@ -242,21 +360,23 @@ export function PaginaFinanceiro() {
       </div>
 
       {/* Abas */}
-      <div className="flex gap-1 border-b border-[var(--borda)]">
-        {abas.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            onClick={() => setAba(a.id)}
-            className={`px-4 py-2 text-sm font-medium transition ${
-              aba === a.id
-                ? 'border-b-2 border-[var(--primaria)] text-[var(--primaria)]'
-                : 'text-[var(--texto-muted)] hover:text-[var(--texto)]'
-            }`}
-          >
-            {a.rotulo}
-          </button>
-        ))}
+      <div className="-mx-1 overflow-x-auto border-b border-[var(--borda)]">
+        <div className="flex min-w-max gap-1 px-1">
+          {abas.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => setAba(a.id)}
+              className={`shrink-0 px-4 py-2 text-sm font-medium transition ${
+                aba === a.id
+                  ? 'border-b-2 border-[var(--primaria)] text-[var(--primaria)]'
+                  : 'text-[var(--texto-muted)] hover:text-[var(--texto)]'
+              }`}
+            >
+              {a.rotulo}
+            </button>
+          ))}
+        </div>
       </div>
 
       {erroGlobal && (
@@ -288,14 +408,16 @@ export function PaginaFinanceiro() {
                 <option value="quitado">Quitado</option>
               </select>
             </div>
-            <div className="flex gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
               <Botao
+                className="w-full sm:w-auto"
                 variante="fantasma"
                 onClick={() => setModalTitulo({ aberto: true, titulo: null, tipoInicial: 'despesa' })}
               >
                 <ArrowDownCircle className="h-4 w-4" /> Nova despesa
               </Botao>
               <Botao
+                className="w-full sm:w-auto"
                 onClick={() => setModalTitulo({ aberto: true, titulo: null, tipoInicial: 'receita' })}
               >
                 <Plus className="h-4 w-4" /> Nova receita
@@ -303,13 +425,29 @@ export function PaginaFinanceiro() {
             </div>
           </div>
 
+          <CampoPesquisa
+            valor={termo}
+            onChange={setTermo}
+            placeholder="Pesquisar por descrição, conta, cliente ou orçamento..."
+          />
+
           <TabelaDados<TituloComRelacoes>
+            idTabela="financeiro-titulos"
+            colunasPadraoMobile={['descricao', 'valor', 'status', 'dataVencimento', 'acoes']}
+            renderCard={renderCardTitulo}
+            onLinhaClick={(t) => {
+              if (t.valorBaixado === 0) {
+                setModalTitulo({ aberto: true, titulo: t })
+              }
+            }}
+            barra={undefined}
             dados={tabelaTitulos.dadosPaginados}
             chave={(t) => t.id}
             colunas={[
               {
                 id: 'descricao',
                 rotulo: 'Descrição',
+                obrigatoria: true,
                 render: (t) => (
                   <div>
                     <p className="font-medium text-[var(--texto)]">{t.descricao}</p>
@@ -381,44 +519,10 @@ export function PaginaFinanceiro() {
               {
                 id: 'acoes',
                 rotulo: '',
-                render: (t) => (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); setModalBaixasLista({ aberto: true, titulo: t }) }}
-                      className="text-xs text-[var(--texto-muted)] hover:text-[var(--texto)]"
-                      title="Ver baixas"
-                    >
-                      <FileText className="h-4 w-4" />
-                    </button>
-                    {t.status !== 'quitado' && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setModalBaixa({ aberto: true, titulo: t })
-                        }}
-                        className="text-xs text-[var(--primaria)] hover:underline"
-                      >
-                        Baixar
-                      </button>
-                    )}
-                    {!t.orcamentoId && t.valorBaixado === 0 && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setErroGlobal('')
-                          setMotivoExclusao('')
-                          setConfirmExclusao(t)
-                        }}
-                        className="text-xs text-erro hover:underline"
-                      >
-                        Excluir
-                      </button>
-                    )}
-                  </div>
-                ),
+                obrigatoria: true,
+                ocultavel: false,
+                exibirNoCard: false,
+                render: (t) => renderAcoesTitulo(t),
               },
             ]}
             ordenacao={tabelaTitulos.ordenacao}
@@ -457,6 +561,54 @@ export function PaginaFinanceiro() {
             </div>
             {fluxo.isLoading ? (
               <p className="mt-3 text-sm text-[var(--texto-muted)]">Carregando...</p>
+            ) : ehMobile ? (
+              <div className="mt-3 space-y-3">
+                {(fluxo.data ?? []).length === 0 && (
+                  <p className="py-4 text-center text-sm text-[var(--texto-muted)]">
+                    Sem títulos pendentes no período.
+                  </p>
+                )}
+                {(() => {
+                  let acumulado = saldoCaixa
+                  return (fluxo.data ?? []).map((linha) => {
+                    acumulado += Number(linha.saldoPeriodo)
+                    const mesLabel = new Date(linha.mes + '-01T12:00:00').toLocaleDateString('pt-BR', {
+                      month: 'long',
+                      year: 'numeric',
+                    })
+                    return (
+                      <div
+                        key={linha.mes}
+                        className="rounded-xl border border-[var(--borda)] bg-[var(--superficie)] p-4"
+                      >
+                        <p className="font-medium capitalize text-[var(--texto)]">{mesLabel}</p>
+                        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-xs text-[var(--texto-muted)]">Receitas</p>
+                            <p className="text-sucesso">{formatarMoeda(linha.receitas)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-[var(--texto-muted)]">Despesas</p>
+                            <p className="text-erro">{formatarMoeda(linha.despesas)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-[var(--texto-muted)]">Saldo do período</p>
+                            <p className={linha.saldoPeriodo >= 0 ? 'font-medium text-sucesso' : 'font-medium text-erro'}>
+                              {formatarMoeda(linha.saldoPeriodo)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-[var(--texto-muted)]">Saldo acumulado</p>
+                            <p className={`font-semibold ${acumulado >= 0 ? 'text-[var(--texto)]' : 'text-erro'}`}>
+                              {formatarMoeda(acumulado)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
             ) : (
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full text-sm">
@@ -522,6 +674,8 @@ export function PaginaFinanceiro() {
             </Botao>
           </div>
           <TabelaDados<FinanceiroPlanoConta>
+            idTabela="financeiro-plano-contas"
+            colunasPadraoMobile={['nome', 'tipo', 'ativo']}
             dados={tabelaPlano.dadosPaginados}
             chave={(c) => c.id}
             onLinhaClick={(c) => setModalPlanoConta({ aberto: true, conta: c })}
@@ -571,6 +725,8 @@ export function PaginaFinanceiro() {
             </Botao>
           </div>
           <TabelaDados<FinanceiroContaCaixa>
+            idTabela="financeiro-contas-caixa"
+            colunasPadraoMobile={['nome', 'saldoAtual', 'ativo']}
             dados={tabelaContas.dadosPaginados}
             chave={(c) => c.id}
             onLinhaClick={(c) => setModalContaCaixa({ aberto: true, conta: c })}

@@ -44,8 +44,10 @@ export function PaginaEstoque() {
 
       <div className="mt-6">
         <TabelaDados
+          idTabela="estoque-materiais"
+          colunasPadraoMobile={['nome', 'categoria', 'disponivel', 'acoes']}
           colunas={[
-            { id: 'nome', rotulo: 'Nome', ordenavel: true },
+            { id: 'nome', rotulo: 'Nome', ordenavel: true, obrigatoria: true },
             { id: 'categoria', rotulo: 'Categoria', ordenavel: true },
             { id: 'unidadeMedida', rotulo: 'Unidade' },
             {
