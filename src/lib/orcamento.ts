@@ -16,7 +16,7 @@ import {
   type PecaCalculo,
   type ResultadoItemCompleto,
 } from '@/lib/calculadora'
-import type { OrcamentoItem, OrcamentoItemComposicao } from '@/tipos/database'
+import type { ImpressoraConfiguracao, OrcamentoItem, OrcamentoItemComposicao } from '@/tipos/database'
 
 export type OrcamentoItemComComposicao = OrcamentoItem & {
   OrcamentoItemComposicao?: OrcamentoItemComposicao[]
@@ -83,6 +83,48 @@ export function itemParaPeca(item: OrcamentoItemComComposicao): {
   }
 
   return { peca, composicao, params }
+}
+
+/**
+ * Reconstrói a configuração operacional (máquina/energia/margens) que foi
+ * usada e gravada como snapshot no item, para restaurar o formulário ao
+ * editar — sem isso, o modal mantém os valores atuais do estado global
+ * (impressora selecionada por último, etc.), que podem já ter mudado desde
+ * que o item foi calculado.
+ */
+export function configDeItem(item: OrcamentoItem): ConfigOperacional {
+  return {
+    consumoKwh: Number(item.consumoKwh),
+    precoKwh: Number(item.precoKwh),
+    valorMaquina: Number(item.valorMaquina),
+    vidaUtilHoras: Number(item.vidaUtilHoras),
+    margemMultiplicador: Number(item.margemMultiplicador),
+    taxaFalha: Number(item.taxaFalha),
+    taxaMarketplace: Number(item.taxaMarketplace),
+  }
+}
+
+/**
+ * Compara (com tolerância a arredondamento) os valores de uma impressora
+ * cadastrada com a configuração de um item, para tentar reselecionar no
+ * formulário qual impressora foi usada — o item não guarda o id da
+ * impressora, só o snapshot numérico.
+ */
+export function impressoraCombinaConfig(
+  imp: ImpressoraConfiguracao,
+  config: ConfigOperacional,
+  tolerancia = 0.0001,
+): boolean {
+  const aprox = (a: number, b: number) => Math.abs(Number(a) - b) < tolerancia
+  return (
+    aprox(imp.consumoKwh, config.consumoKwh) &&
+    aprox(imp.precoKwh, config.precoKwh) &&
+    aprox(imp.valorMaquina, config.valorMaquina) &&
+    aprox(imp.vidaUtilHoras, config.vidaUtilHoras) &&
+    aprox(imp.margemMultiplicador, config.margemMultiplicador) &&
+    aprox(imp.taxaFalha, config.taxaFalha) &&
+    aprox(imp.taxaMarketplace, config.taxaMarketplace)
+  )
 }
 
 export function itemParaAvulso(item: OrcamentoItemComComposicao): AvulsoCalculo {

@@ -24,6 +24,8 @@ import {
 import {
   atualizarItemAvulso,
   atualizarOrcamentoItem,
+  configDeItem,
+  impressoraCombinaConfig,
   itemParaAvulso,
   itemParaPeca,
   salvarItemAvulso,
@@ -109,6 +111,11 @@ export function ModalCalculadora({
     setErrosCampo({})
 
     if (itemEdicao) {
+      // Restaura a config (máquina/energia/margens) que foi usada e gravada
+      // no item — sem isso o modal fica com o que estava no estado global
+      // (ex.: impressora selecionada da última vez), causando diferenças.
+      impressoraCalculoStore.setConfig(configDeItem(itemEdicao))
+
       if (tipoItem === 'peca') {
         const { peca: p, params: pm } = itemParaPeca(itemEdicao)
         setPeca(clonarPeca(p))
@@ -126,12 +133,23 @@ export function ModalCalculadora({
     } else {
       setPeca(pecaVazia())
       setAvulso(avulsoVazio())
-      setParams(paramsMargemDeConfig(config))
+      setParams(paramsMargemDeConfig(impressoraCalculoStore.getState().config))
     }
-  }, [aberto, itemEdicao, tipoItem, config])
+  }, [aberto, itemEdicao, tipoItem])
 
   useEffect(() => {
-    if (!aberto || !impressoras.data || itemEdicao) return
+    if (!aberto || !impressoras.data) return
+
+    if (itemEdicao) {
+      // O item não guarda o id da impressora usada, só o snapshot numérico —
+      // tentamos reencontrar a impressora que combina com esses valores só
+      // para reselecionar o dropdown; a config em si já foi restaurada acima.
+      const configItem = configDeItem(itemEdicao)
+      const impressoraUsada = impressoras.data.find((i) => impressoraCombinaConfig(i, configItem))
+      impressoraCalculoStore.setImpressoraId(impressoraUsada?.id ?? '')
+      return
+    }
+
     const impId = orcamento.data?.configuracaoImpressoraId
     const imp = impId ? impressoras.data.find((i) => i.id === impId) : impressoras.data[0]
     if (imp) impressoraCalculoStore.aplicarImpressora(imp)
@@ -246,7 +264,15 @@ export function ModalCalculadora({
   return (
     <Modal aberto={aberto} onFechar={onFechar} titulo={titulo} largura="2xl">
       <div className="space-y-6">
-        <PainelConfigCalculadora onConfigAlterada={() => setParams(paramsMargemDeConfig(config))} />
+        <PainelConfigCalculadora
+          onConfigAlterada={() => {
+            // Ao editar, os parâmetros de margem já vêm do item (params) e
+            // não devem ser sobrescritos só porque a config da impressora
+            // foi tocada (ex.: ajustar consumo de kWh não deve zerar
+            // desconto/adicional do item).
+            if (!itemEdicao) setParams(paramsMargemDeConfig(config))
+          }}
+        />
 
         {tipoItem === 'peca' ? (
           <FormularioPecaOrcamento

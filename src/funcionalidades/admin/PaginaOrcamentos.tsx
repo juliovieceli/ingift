@@ -15,6 +15,14 @@ import type { Orcamento } from '@/tipos/database'
 type OrcamentoLista = Orcamento & {
   Cliente?: { nome: string }
   OrcamentoStatus?: { nome: string; codigo: string }
+  OrcamentoItem?: { nomePeca: string; ordem: number }[]
+}
+
+function nomesPecas(o: OrcamentoLista) {
+  return [...(o.OrcamentoItem ?? [])]
+    .sort((a, b) => a.ordem - b.ordem)
+    .map((i) => i.nomePeca)
+    .join(', ')
 }
 
 export function PaginaOrcamentos() {
@@ -29,7 +37,7 @@ export function PaginaOrcamentos() {
       if (!supabase) return []
       const { data } = await supabase
         .from('Orcamento')
-        .select('*, Cliente(nome), OrcamentoStatus(nome, codigo)')
+        .select('*, Cliente(nome), OrcamentoStatus(nome, codigo), OrcamentoItem(nomePeca, ordem)')
         .order('criadoEm', { ascending: false })
       return (data ?? []) as OrcamentoLista[]
     },
@@ -65,6 +73,7 @@ export function PaginaOrcamentos() {
       o.OrcamentoStatus?.nome ?? '',
       new Date(o.criadoEm).toLocaleDateString('pt-BR'),
       o.validoAte ? new Date(o.validoAte).toLocaleDateString('pt-BR') : '',
+      nomesPecas(o),
     ]
     return parts.join(' ')
   }, [])
@@ -94,6 +103,9 @@ export function PaginaOrcamentos() {
         <div className="min-w-0">
           <p className="text-xs text-[var(--texto-muted)]">#{o.numeroSequencial}</p>
           <p className="font-medium text-[var(--texto)]">{o.Cliente?.nome ?? '—'}</p>
+          {nomesPecas(o) && (
+            <p className="mt-0.5 truncate text-xs text-[var(--texto-muted)]">{nomesPecas(o)}</p>
+          )}
         </div>
         <span className="shrink-0 rounded-full bg-secondary-500/15 px-2 py-0.5 text-xs text-secondary-700 dark:text-secondary-300">
           {o.OrcamentoStatus?.nome ?? '—'}
@@ -134,6 +146,15 @@ export function PaginaOrcamentos() {
           colunas={[
             { id: 'numeroSequencial', rotulo: '#', ordenavel: true, obrigatoria: true, render: (o) => `#${o.numeroSequencial}` },
             { id: 'cliente', rotulo: 'Cliente', ordenavel: true, obrigatoria: true, render: (o) => o.Cliente?.nome ?? '—' },
+            {
+              id: 'pecas',
+              rotulo: 'Peças',
+              render: (o) => (
+                <span className="line-clamp-1 max-w-[220px] text-[var(--texto-secundario)]" title={nomesPecas(o)}>
+                  {nomesPecas(o) || '—'}
+                </span>
+              ),
+            },
             {
               id: 'status',
               rotulo: 'Status',

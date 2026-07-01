@@ -42,6 +42,9 @@ export function PaginaDetalheOrcamento() {
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
   const [modalHistorico, setModalHistorico] = useState(false)
   const [modalStatus, setModalStatus] = useState(false)
+  const [modalCliente, setModalCliente] = useState(false)
+  const [novoClienteId, setNovoClienteId] = useState('')
+  const [erroCliente, setErroCliente] = useState('')
   const [modalFaturar, setModalFaturar] = useState(false)
   const [modalLiberarFaturamento, setModalLiberarFaturamento] = useState(false)
   const [motivoLiberacao, setMotivoLiberacao] = useState('')
@@ -131,6 +134,16 @@ export function PaginaDetalheOrcamento() {
       if (!supabase) return []
       const { data } = await supabase.from('OrcamentoStatus').select('*').eq('ativo', true).order('ordem')
       return (data ?? []) as OrcamentoStatus[]
+    },
+  })
+
+  const clientes = useQuery({
+    queryKey: ['clientes'],
+    enabled: modalCliente,
+    queryFn: async () => {
+      if (!supabase) return []
+      const { data } = await supabase.from('Cliente').select('id, nome').eq('ativo', true).order('nome')
+      return (data ?? []) as { id: string; nome: string }[]
     },
   })
 
@@ -226,6 +239,23 @@ export function PaginaDetalheOrcamento() {
       }
       setErro(msg)
     },
+  })
+
+  const alterarCliente = useMutation({
+    mutationFn: async () => {
+      if (!supabase || !id || !novoClienteId) throw new Error('Selecione um cliente')
+      if (novoClienteId === orcamento.data?.clienteId) throw new Error('Cliente já é o atual')
+      const { error } = await supabase.from('Orcamento').update({ clienteId: novoClienteId }).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setErroCliente('')
+      setModalCliente(false)
+      setNovoClienteId('')
+      qc.invalidateQueries({ queryKey: ['orcamento', id] })
+      qc.invalidateQueries({ queryKey: ['orcamentos'] })
+    },
+    onError: (e) => setErroCliente(e instanceof Error ? e.message : 'Erro ao alterar cliente'),
   })
 
   const excluirItem = useMutation({
@@ -328,6 +358,16 @@ export function PaginaDetalheOrcamento() {
                 <p className="mt-1 flex items-center gap-2 text-xl font-semibold text-[var(--texto)]">
                   <User className="h-5 w-5 shrink-0 text-[var(--texto-muted)]" />
                   {o.Cliente.nome}
+                  {!faturado && (
+                    <button
+                      type="button"
+                      onClick={() => { setErroCliente(''); setNovoClienteId(o.clienteId); setModalCliente(true) }}
+                      className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-lg text-[var(--texto-muted)] hover:bg-[var(--superficie-elevada)] hover:text-[var(--texto)]"
+                      aria-label="Alterar cliente"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                  )}
                 </p>
               )}
               {o.Cliente?.telefone && (
@@ -641,6 +681,41 @@ export function PaginaDetalheOrcamento() {
               disabled={alterarStatus.isPending}
             >
               {alterarStatus.isPending ? 'Salvando...' : avisoReversaoEstoque ? 'Confirmar e alterar' : 'Atualizar status'}
+            </Botao>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        aberto={modalCliente}
+        onFechar={() => { setModalCliente(false); setErroCliente('') }}
+        titulo="Alterar cliente"
+        largura="md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-[var(--texto-muted)]">
+            Cliente atual: <span className="font-medium text-[var(--texto)]">{o.Cliente?.nome ?? '—'}</span>
+          </p>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-[var(--texto-secundario)]">Novo cliente</span>
+            <select
+              value={novoClienteId || o.clienteId}
+              onChange={(e) => setNovoClienteId(e.target.value)}
+              className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2"
+            >
+              {clientes.data?.map((c) => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+          </label>
+
+          {erroCliente && <p className="text-sm text-erro">{erroCliente}</p>}
+          <div className="flex justify-end gap-2">
+            <Botao type="button" variante="fantasma" onClick={() => { setModalCliente(false); setErroCliente('') }}>
+              Cancelar
+            </Botao>
+            <Botao onClick={() => alterarCliente.mutate()} disabled={alterarCliente.isPending}>
+              {alterarCliente.isPending ? 'Salvando...' : 'Salvar'}
             </Botao>
           </div>
         </div>
