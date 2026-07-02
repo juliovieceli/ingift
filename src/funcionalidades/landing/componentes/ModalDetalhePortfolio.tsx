@@ -4,7 +4,7 @@ import { Modal } from '@/componentes/ui/Modal'
 interface Props {
   aberto: boolean
   titulo: string
-  descricao: string
+  descricao?: string | null
   urlImagem: string
   grupo: string | null
   urlLoja: string | null
@@ -36,7 +36,11 @@ export function ModalDetalhePortfolio({
               {grupo}
             </span>
           )}
-          <p className="whitespace-pre-wrap text-[var(--texto-secundario)]">{descricao}</p>
+          {descricao?.trim() ? (
+            <p className="whitespace-pre-wrap text-[var(--texto-secundario)]">{descricao}</p>
+          ) : (
+            <p className="text-sm italic text-[var(--texto-muted)]">Sem descrição cadastrada.</p>
+          )}
           {urlLoja && (
             <a href={urlLoja} target="_blank" rel="noreferrer" className="mt-1 inline-block self-start">
               <Botao type="button" variante="secundario">

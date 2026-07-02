@@ -15,7 +15,6 @@ export function CardPortfolio({ item, nomeGrupo = null, idx = 0, hoverCapaz = fa
   const descRef = useRef<HTMLParagraphElement>(null)
   const [truncado, setTruncado] = useState(false)
   const [modalAberto, setModalAberto] = useState(false)
-  const clicavel = Boolean(item.descricao)
 
   useEffect(() => {
     const el = descRef.current
@@ -26,12 +25,9 @@ export function CardPortfolio({ item, nomeGrupo = null, idx = 0, hoverCapaz = fa
     setTruncado(el.scrollHeight > el.clientHeight + 1)
   }, [item.descricao])
 
-  const abrirDetalhe = () => {
-    if (clicavel) setModalAberto(true)
-  }
+  const abrirDetalhe = () => setModalAberto(true)
 
   const aoTeclar = (e: KeyboardEvent<HTMLElement>) => {
-    if (!clicavel) return
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       abrirDetalhe()
@@ -41,13 +37,11 @@ export function CardPortfolio({ item, nomeGrupo = null, idx = 0, hoverCapaz = fa
   return (
     <>
       <figure
-        role={clicavel ? 'button' : undefined}
-        tabIndex={clicavel ? 0 : undefined}
+        role="button"
+        tabIndex={0}
         onClick={abrirDetalhe}
         onKeyDown={aoTeclar}
-        className={`group flex w-full flex-col overflow-hidden rounded-xl border border-[var(--borda)] ${
-          clicavel ? 'cursor-pointer transition hover:border-secondary-500/50' : ''
-        } ${className}`}
+        className={`group flex w-full cursor-pointer flex-col overflow-hidden rounded-xl border border-[var(--borda)] transition hover:border-secondary-500/50 ${className}`}
         style={{ transitionDelay: `${idx * 80}ms` }}
       >
         <div className="relative aspect-square overflow-hidden">
@@ -87,17 +81,15 @@ export function CardPortfolio({ item, nomeGrupo = null, idx = 0, hoverCapaz = fa
         </figcaption>
       </figure>
 
-      {item.descricao && (
-        <ModalDetalhePortfolio
-          aberto={modalAberto}
-          titulo={item.titulo}
-          descricao={item.descricao}
-          urlImagem={item.urlImagem}
-          grupo={nomeGrupo}
-          urlLoja={item.urlLoja}
-          onFechar={() => setModalAberto(false)}
-        />
-      )}
+      <ModalDetalhePortfolio
+        aberto={modalAberto}
+        titulo={item.titulo}
+        descricao={item.descricao}
+        urlImagem={item.urlImagem}
+        grupo={nomeGrupo}
+        urlLoja={item.urlLoja}
+        onFechar={() => setModalAberto(false)}
+      />
     </>
   )
 }

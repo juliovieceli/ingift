@@ -4,6 +4,7 @@ import { useRef } from 'react'
 import { FundoHeroInterativo } from './componentes/FundoHeroInterativo'
 import { IndicadorScroll } from './componentes/IndicadorScroll'
 import { TextoRotativo } from './componentes/TextoRotativo'
+import { scrollParaSecao } from './scrollSecao'
 import type { ConteudoHero } from './conteudoHero'
 import type { ConteudoMarca } from './conteudoMarca'
 
@@ -86,6 +87,11 @@ export function SecaoHero({ hero, marca, whatsapp }: Props) {
           </a>
           <a
             href="#portfolio"
+            onClick={(e) => {
+              e.preventDefault()
+              window.history.replaceState(null, '', '#portfolio')
+              scrollParaSecao('portfolio')
+            }}
             className="rounded-lg border border-white/30 px-6 py-3 text-sm font-medium text-white transition hover:border-white hover:bg-white/10"
           >
             {hero.ctaSecundario}

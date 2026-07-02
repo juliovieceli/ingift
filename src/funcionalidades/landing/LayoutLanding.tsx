@@ -1,12 +1,24 @@
-import { Link, Outlet } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import { TemaToggle } from '@/componentes/TemaToggle'
 import { SplashLanding } from './componentes/SplashLanding'
 import { parseConteudoMarca } from './conteudoMarca'
+import { LinkSecao } from './LinkSecao'
+import { scrollParaSecao } from './scrollSecao'
 import { useLandingDados } from './useLandingDados'
 import { Rodape } from './Rodape'
 
 export function LayoutLanding() {
   const { carregando, secao } = useLandingDados()
+  const location = useLocation()
+
+  useEffect(() => {
+    if (location.pathname !== '/') return
+    const id = location.hash.replace(/^#/, '')
+    if (!id) return
+    const timer = window.setTimeout(() => scrollParaSecao(id), 80)
+    return () => clearTimeout(timer)
+  }, [location.pathname, location.hash])
 
   if (carregando) {
     return <SplashLanding />
@@ -23,15 +35,15 @@ export function LayoutLanding() {
             <span className="hidden font-bold text-[var(--texto)] sm:inline">{marca.nomeMarca}</span>
           </Link>
           <nav className="flex items-center gap-4 text-sm">
-            <Link to="/#servicos" className="text-[var(--texto-secundario)] hover:text-secondary-500">
+            <LinkSecao id="servicos" className="text-[var(--texto-secundario)] hover:text-secondary-500">
               Serviços
-            </Link>
-            <Link to="/#portfolio" className="text-[var(--texto-secundario)] hover:text-secondary-500">
+            </LinkSecao>
+            <LinkSecao id="portfolio" className="text-[var(--texto-secundario)] hover:text-secondary-500">
               Portfólio
-            </Link>
-            <Link to="/#contato" className="text-[var(--texto-secundario)] hover:text-secondary-500">
+            </LinkSecao>
+            <LinkSecao id="contato" className="text-[var(--texto-secundario)] hover:text-secondary-500">
               Contato
-            </Link>
+            </LinkSecao>
             <TemaToggle />
           </nav>
         </div>
