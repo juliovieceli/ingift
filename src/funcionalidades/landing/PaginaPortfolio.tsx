@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { CampoPesquisa } from '@/componentes/ui/CampoPesquisa'
 import { usePrefersMotion } from '@/hooks/usePrefersMotion'
 import { CardPortfolio } from '@/funcionalidades/landing/componentes/CardPortfolio'
+import { nomeGrupo } from '@/funcionalidades/landing/portfolioGrupo'
 import { useLandingDados } from './useLandingDados'
 
 function normalizarBusca(texto: string): string {
@@ -11,37 +12,48 @@ function normalizarBusca(texto: string): string {
 }
 
 export function PaginaPortfolio() {
-  const { secao, portfolio } = useLandingDados()
+  const { secao, portfolioGrupos, portfolio } = useLandingDados()
   const { hoverCapaz } = usePrefersMotion()
   const portfolioSecao = secao('portfolio')?.conteudo as { subtitulo?: string } | undefined
+  const [params, setParams] = useSearchParams()
   const [busca, setBusca] = useState('')
-  const [grupoAtivo, setGrupoAtivo] = useState<string | null>(null)
+  const [grupoAtivo, setGrupoAtivo] = useState<string | null>(params.get('grupo'))
+
+  const grupos = useMemo(
+    () => [...(portfolioGrupos.data ?? [])].sort((a, b) => a.ordem - b.ordem),
+    [portfolioGrupos.data],
+  )
 
   const itens = useMemo(
     () => [...(portfolio.data ?? [])].sort((a, b) => a.ordem - b.ordem),
     [portfolio.data],
   )
 
-  const grupos = useMemo(() => {
-    const set = new Set<string>()
-    for (const item of itens) {
-      const g = item.grupo?.trim()
-      if (g) set.add(g)
+  useEffect(() => {
+    const id = params.get('grupo')
+    setGrupoAtivo(id)
+  }, [params])
+
+  const selecionarGrupo = (id: string | null) => {
+    setGrupoAtivo(id)
+    if (id) {
+      setParams({ grupo: id })
+    } else {
+      setParams({})
     }
-    return [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'))
-  }, [itens])
+  }
 
   const itensFiltrados = useMemo(() => {
     const termo = normalizarBusca(busca)
     return itens.filter((item) => {
-      if (grupoAtivo && item.grupo?.trim() !== grupoAtivo) return false
+      if (grupoAtivo && item.grupoId !== grupoAtivo) return false
       if (!termo) return true
       const titulo = item.titulo.toLowerCase()
       const descricao = (item.descricao ?? '').toLowerCase()
-      const grupo = (item.grupo ?? '').toLowerCase()
+      const grupo = (nomeGrupo(item.grupoId, grupos) ?? '').toLowerCase()
       return titulo.includes(termo) || descricao.includes(termo) || grupo.includes(termo)
     })
-  }, [itens, busca, grupoAtivo])
+  }, [itens, busca, grupoAtivo, grupos])
 
   return (
     <div className="bg-[var(--superficie)] px-4 py-12">
@@ -76,7 +88,7 @@ export function PaginaPortfolio() {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => setGrupoAtivo(null)}
+                  onClick={() => selecionarGrupo(null)}
                   className={`rounded-full px-3 py-1 text-sm transition ${
                     grupoAtivo === null
                       ? 'bg-secondary-500 text-[var(--secundaria-fg)]'
@@ -87,16 +99,16 @@ export function PaginaPortfolio() {
                 </button>
                 {grupos.map((g) => (
                   <button
-                    key={g}
+                    key={g.id}
                     type="button"
-                    onClick={() => setGrupoAtivo(g)}
+                    onClick={() => selecionarGrupo(g.id)}
                     className={`rounded-full px-3 py-1 text-sm transition ${
-                      grupoAtivo === g
+                      grupoAtivo === g.id
                         ? 'bg-secondary-500 text-[var(--secundaria-fg)]'
                         : 'border border-[var(--borda)] text-[var(--texto-secundario)] hover:border-secondary-500'
                     }`}
                   >
-                    {g}
+                    {g.nome}
                   </button>
                 ))}
               </div>
@@ -111,7 +123,13 @@ export function PaginaPortfolio() {
         ) : (
           <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {itensFiltrados.map((item, idx) => (
-              <CardPortfolio key={item.id} item={item} idx={idx} hoverCapaz={hoverCapaz} />
+              <CardPortfolio
+                key={item.id}
+                item={item}
+                idx={idx}
+                hoverCapaz={hoverCapaz}
+                nomeGrupo={nomeGrupo(item.grupoId, grupos)}
+              />
             ))}
           </div>
         )}

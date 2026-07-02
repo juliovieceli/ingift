@@ -1,11 +1,17 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { formatarMoeda } from '@/lib/calculadora'
 import { criarOrcamentoVazio } from '@/lib/orcamento'
+import {
+  type CampoDataOrcamentoFiltro,
+  passaFiltroDataOrcamento,
+  ROTULOS_CAMPO_DATA_ORCAMENTO,
+} from '@/lib/orcamentoFiltroData'
 import { Botao } from '@/componentes/ui/Botao'
 import { CampoPesquisa } from '@/componentes/ui/CampoPesquisa'
+import { Input } from '@/componentes/ui/Input'
 import { Modal } from '@/componentes/ui/Modal'
 import { TabelaDados } from '@/componentes/ui/TabelaDados'
 import { useOrdenacaoPaginacao } from '@/hooks/useOrdenacaoPaginacao'
@@ -30,6 +36,9 @@ export function PaginaOrcamentos() {
   const [modalNovo, setModalNovo] = useState(false)
   const [clienteId, setClienteId] = useState('')
   const [erro, setErro] = useState('')
+  const [campoData, setCampoData] = useState<CampoDataOrcamentoFiltro>('lancamento')
+  const [dataInicio, setDataInicio] = useState('')
+  const [dataFim, setDataFim] = useState('')
 
   const orcamentos = useQuery({
     queryKey: ['orcamentos'],
@@ -73,13 +82,25 @@ export function PaginaOrcamentos() {
       o.OrcamentoStatus?.nome ?? '',
       new Date(o.criadoEm).toLocaleDateString('pt-BR'),
       o.validoAte ? new Date(o.validoAte).toLocaleDateString('pt-BR') : '',
+      o.prazoEntrega ? new Date(o.prazoEntrega + 'T12:00:00').toLocaleDateString('pt-BR') : '',
       nomesPecas(o),
     ]
     return parts.join(' ')
   }, [])
 
   const { termo, setTermo, filtrados } = usePesquisa(orcamentos.data ?? [], extrairTexto, 200)
-  const tabela = useOrdenacaoPaginacao(filtrados, 'criadoEm', 'desc')
+
+  const filtradosPorData = useMemo(
+    () => filtrados.filter((o) => passaFiltroDataOrcamento(o, campoData, dataInicio, dataFim)),
+    [filtrados, campoData, dataInicio, dataFim],
+  )
+
+  const tabela = useOrdenacaoPaginacao(filtradosPorData, 'criadoEm', 'desc')
+
+  const limparFiltroData = () => {
+    setDataInicio('')
+    setDataFim('')
+  }
 
   const dadosComSort = useMemo(() => {
     return tabela.dadosPaginados.map((o) => ({
@@ -114,6 +135,9 @@ export function PaginaOrcamentos() {
       <div className="mt-3 flex items-end justify-between gap-2">
         <div className="text-sm text-[var(--texto-muted)]">
           <p>{new Date(o.criadoEm).toLocaleDateString('pt-BR')}</p>
+          {o.prazoEntrega && (
+            <p className="text-xs">Entrega {new Date(o.prazoEntrega + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+          )}
           {o.validoAte && (
             <p className="text-xs">Válido até {new Date(o.validoAte).toLocaleDateString('pt-BR')}</p>
           )}
@@ -127,15 +151,64 @@ export function PaginaOrcamentos() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-2xl font-bold text-[var(--texto)]">Orçamentos</h2>
-        <Botao className="w-full sm:w-auto" onClick={() => { setErro(''); setModalNovo(true) }}>Novo orçamento</Botao>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Botao className="w-full sm:w-auto" onClick={() => { setErro(''); setModalNovo(true) }}>Novo orçamento</Botao>
+          <Link to="/admin/orcamentos/modelos" className="w-full sm:w-auto">
+            <Botao type="button" variante="fantasma" className="w-full">Modelos de peça</Botao>
+          </Link>
+        </div>
       </div>
 
-      <div className="mt-4">
-        <CampoPesquisa
-          valor={termo}
-          onChange={setTermo}
-          placeholder="Pesquisar por #, cliente, status ou data..."
-        />
+      <div className="mt-4 rounded-xl border border-[var(--borda)] bg-[var(--superficie)] p-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+          <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm lg:min-w-[220px]">
+            <span className="text-[var(--texto-secundario)]">Pesquisar</span>
+            <CampoPesquisa
+              valor={termo}
+              onChange={setTermo}
+              placeholder="Por #, cliente, status ou data..."
+              className="w-full max-w-none"
+            />
+          </label>
+          <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-sm lg:max-w-[220px]">
+            <span className="text-[var(--texto-secundario)]">Filtrar por</span>
+            <select
+              value={campoData}
+              onChange={(e) => setCampoData(e.target.value as CampoDataOrcamentoFiltro)}
+              className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2 text-[var(--texto)]"
+            >
+              {(Object.entries(ROTULOS_CAMPO_DATA_ORCAMENTO) as [CampoDataOrcamentoFiltro, string][]).map(
+                ([valor, rotulo]) => (
+                  <option key={valor} value={valor}>{rotulo}</option>
+                ),
+              )}
+            </select>
+          </label>
+          <Input
+            rotulo="Data início"
+            type="date"
+            value={dataInicio}
+            onChange={(e) => setDataInicio(e.target.value)}
+            className="sm:w-40"
+          />
+          <Input
+            rotulo="Data fim"
+            type="date"
+            value={dataFim}
+            onChange={(e) => setDataFim(e.target.value)}
+            className="sm:w-40"
+          />
+          {(termo || dataInicio || dataFim) && (
+            <Botao
+              type="button"
+              variante="fantasma"
+              onClick={() => { setTermo(''); limparFiltroData() }}
+              className="sm:mb-0.5"
+            >
+              Limpar filtros
+            </Botao>
+          )}
+        </div>
       </div>
 
       <div className="mt-6">
@@ -169,6 +242,13 @@ export function PaginaOrcamentos() {
               rotulo: 'Total',
               ordenavel: true,
               render: (o) => <span className="font-medium">{formatarMoeda(Number(o.precoTotal))}</span>,
+            },
+            {
+              id: 'prazoEntrega',
+              rotulo: 'Previsão entrega',
+              render: (o) => o.prazoEntrega
+                ? new Date(o.prazoEntrega + 'T12:00:00').toLocaleDateString('pt-BR')
+                : '—',
             },
             {
               id: 'validoAte',

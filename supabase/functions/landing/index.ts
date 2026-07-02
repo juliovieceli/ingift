@@ -34,25 +34,32 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(url, chave, { auth: { persistSession: false } })
 
-    const [secoesRes, portfolioRes] = await Promise.all([
+    const [secoesRes, gruposRes, portfolioRes] = await Promise.all([
       supabase
         .from('SecaoLanding')
         .select('slug, titulo, conteudo, ordem')
         .eq('publicado', true)
         .order('ordem'),
       supabase
+        .from('PortfolioGrupo')
+        .select('id, nome, descricao, urlImagem, ordem')
+        .eq('publicado', true)
+        .order('ordem'),
+      supabase
         .from('PortfolioItem')
-        .select('id, titulo, descricao, urlImagem, urlLoja, grupo, ordem')
+        .select('id, titulo, descricao, urlImagem, urlLoja, grupoId, ordem')
         .eq('publicado', true)
         .order('ordem'),
     ])
 
     if (secoesRes.error) throw secoesRes.error
+    if (gruposRes.error) throw gruposRes.error
     if (portfolioRes.error) throw portfolioRes.error
 
     return new Response(
       JSON.stringify({
         secoes: secoesRes.data ?? [],
+        portfolioGrupos: gruposRes.data ?? [],
         portfolio: portfolioRes.data ?? [],
       }),
       {

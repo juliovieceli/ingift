@@ -1,9 +1,13 @@
-import type { PortfolioItem, SecaoLanding } from '@/tipos/database'
+import type { PortfolioGrupo, PortfolioItem, SecaoLanding } from '@/tipos/database'
 import { supabase } from '@/lib/supabase'
+
+export type PortfolioGrupoLanding = Pick<PortfolioGrupo, 'id' | 'nome' | 'descricao' | 'urlImagem' | 'ordem'>
+export type PortfolioItemLanding = Pick<PortfolioItem, 'id' | 'titulo' | 'descricao' | 'urlImagem' | 'urlLoja' | 'grupoId' | 'ordem'>
 
 export interface DadosLanding {
   secoes: Pick<SecaoLanding, 'slug' | 'titulo' | 'conteudo' | 'ordem'>[]
-  portfolio: Pick<PortfolioItem, 'id' | 'titulo' | 'descricao' | 'urlImagem' | 'urlLoja' | 'grupo' | 'ordem'>[]
+  portfolioGrupos: PortfolioGrupoLanding[]
+  portfolio: PortfolioItemLanding[]
 }
 
 function urlLandingApi(): string | null {
@@ -25,7 +29,11 @@ async function buscarViaEdgeFunction(): Promise<DadosLanding | null> {
     if (!res.ok) return null
     const dados = (await res.json()) as DadosLanding & { erro?: string }
     if (dados.erro || !Array.isArray(dados.secoes) || !Array.isArray(dados.portfolio)) return null
-    return dados
+    return {
+      secoes: dados.secoes,
+      portfolioGrupos: Array.isArray(dados.portfolioGrupos) ? dados.portfolioGrupos : [],
+      portfolio: dados.portfolio,
+    }
   } catch {
     return null
   }
@@ -34,15 +42,17 @@ async function buscarViaEdgeFunction(): Promise<DadosLanding | null> {
 async function buscarViaSupabase(): Promise<DadosLanding | null> {
   if (!supabase) return null
 
-  const [secoesRes, portfolioRes] = await Promise.all([
+  const [secoesRes, gruposRes, portfolioRes] = await Promise.all([
     supabase.from('SecaoLandingPublica').select('slug, titulo, conteudo, ordem').order('ordem'),
-    supabase.from('PortfolioItemPublico').select('id, titulo, descricao, urlImagem, urlLoja, grupo, ordem').order('ordem'),
+    supabase.from('PortfolioGrupoPublico').select('id, nome, descricao, urlImagem, ordem').order('ordem'),
+    supabase.from('PortfolioItemPublico').select('id, titulo, descricao, urlImagem, urlLoja, grupoId, ordem').order('ordem'),
   ])
 
-  if (secoesRes.error || portfolioRes.error) return null
+  if (secoesRes.error || gruposRes.error || portfolioRes.error) return null
 
   return {
     secoes: (secoesRes.data ?? []) as DadosLanding['secoes'],
+    portfolioGrupos: (gruposRes.data ?? []) as DadosLanding['portfolioGrupos'],
     portfolio: (portfolioRes.data ?? []) as DadosLanding['portfolio'],
   }
 }

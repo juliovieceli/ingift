@@ -1,19 +1,21 @@
 import { Botao } from '@/componentes/ui/Botao'
 import { ModalDetalhePortfolio } from '@/funcionalidades/landing/componentes/ModalDetalhePortfolio'
 import type { PortfolioItem } from '@/tipos/database'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 
 interface Props {
   item: PortfolioItem
+  nomeGrupo?: string | null
   idx?: number
   hoverCapaz?: boolean
   className?: string
 }
 
-export function CardPortfolio({ item, idx = 0, hoverCapaz = false, className = '' }: Props) {
+export function CardPortfolio({ item, nomeGrupo = null, idx = 0, hoverCapaz = false, className = '' }: Props) {
   const descRef = useRef<HTMLParagraphElement>(null)
   const [truncado, setTruncado] = useState(false)
   const [modalAberto, setModalAberto] = useState(false)
+  const clicavel = Boolean(item.descricao)
 
   useEffect(() => {
     const el = descRef.current
@@ -24,12 +26,28 @@ export function CardPortfolio({ item, idx = 0, hoverCapaz = false, className = '
     setTruncado(el.scrollHeight > el.clientHeight + 1)
   }, [item.descricao])
 
-  const abrirDetalhe = () => setModalAberto(true)
+  const abrirDetalhe = () => {
+    if (clicavel) setModalAberto(true)
+  }
+
+  const aoTeclar = (e: KeyboardEvent<HTMLElement>) => {
+    if (!clicavel) return
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      abrirDetalhe()
+    }
+  }
 
   return (
     <>
       <figure
-        className={`group flex w-full flex-col overflow-hidden rounded-xl border border-[var(--borda)] ${className}`}
+        role={clicavel ? 'button' : undefined}
+        tabIndex={clicavel ? 0 : undefined}
+        onClick={abrirDetalhe}
+        onKeyDown={aoTeclar}
+        className={`group flex w-full flex-col overflow-hidden rounded-xl border border-[var(--borda)] ${
+          clicavel ? 'cursor-pointer transition hover:border-secondary-500/50' : ''
+        } ${className}`}
         style={{ transitionDelay: `${idx * 80}ms` }}
       >
         <div className="relative aspect-square overflow-hidden">
@@ -45,22 +63,13 @@ export function CardPortfolio({ item, idx = 0, hoverCapaz = false, className = '
           )}
         </div>
         <figcaption className="flex flex-1 flex-col p-3">
-      {/*     {item.grupo && (
-            <span className="mb-1 w-fit rounded-full bg-[var(--superficie-elevada)] px-2 py-0.5 text-xs text-[var(--texto-muted)]">
-              {item.grupo}
-            </span>
-          )} */}
           <p className="font-medium text-[var(--texto)]">{item.titulo}</p>
           {item.descricao && (
-            <button
-              type="button"
-              onClick={abrirDetalhe}
-              className={`mt-1 w-full text-left transition ${truncado ? 'hover:opacity-80' : 'hover:text-[var(--texto-secundario)]'}`}
-            >
+            <div className={`mt-1 w-full text-left ${truncado ? 'opacity-90' : ''}`}>
               <p ref={descRef} className="line-clamp-3 text-sm text-[var(--texto-muted)]">
                 {item.descricao}
               </p>
-            </button>
+            </div>
           )}
           {item.urlLoja && (
             <a
@@ -84,7 +93,7 @@ export function CardPortfolio({ item, idx = 0, hoverCapaz = false, className = '
           titulo={item.titulo}
           descricao={item.descricao}
           urlImagem={item.urlImagem}
-          grupo={item.grupo}
+          grupo={nomeGrupo}
           urlLoja={item.urlLoja}
           onFechar={() => setModalAberto(false)}
         />

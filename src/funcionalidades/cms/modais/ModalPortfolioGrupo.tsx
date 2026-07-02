@@ -6,64 +6,48 @@ import { CampoImagemCms } from '@/componentes/ui/CampoImagemCms'
 import { Checkbox } from '@/componentes/ui/Checkbox'
 import { Input } from '@/componentes/ui/Input'
 import { Modal } from '@/componentes/ui/Modal'
-import { CampoGrupoPortfolio } from '@/funcionalidades/cms/CampoGrupoPortfolio'
 import { extrairCaminhoStorage, removerImagemCms } from '@/lib/storageImagem'
-import type { PortfolioItem } from '@/tipos/database'
+import type { PortfolioGrupo } from '@/tipos/database'
 
 interface Props {
   aberto: boolean
-  item: PortfolioItem | null
+  grupo: PortfolioGrupo | null
   onFechar: () => void
   onSalvo: () => void
 }
 
-function urlValida(url: string): boolean {
-  try {
-    const u = new URL(url)
-    return u.protocol === 'http:' || u.protocol === 'https:'
-  } catch {
-    return false
-  }
-}
-
-function valoresIniciais(item: PortfolioItem | null) {
-  if (item) {
+function valoresIniciais(grupo: PortfolioGrupo | null) {
+  if (grupo) {
     return {
-      titulo: item.titulo,
-      descricao: item.descricao ?? '',
-      urlImagem: item.urlImagem,
-      urlLoja: item.urlLoja ?? '',
-      grupoId: item.grupoId ?? '',
-      ordem: item.ordem,
-      publicado: item.publicado,
+      nome: grupo.nome,
+      descricao: grupo.descricao ?? '',
+      urlImagem: grupo.urlImagem ?? '',
+      ordem: grupo.ordem,
+      publicado: grupo.publicado,
     }
   }
   return {
-    titulo: '',
+    nome: '',
     descricao: '',
     urlImagem: '',
-    urlLoja: '',
-    grupoId: '',
     ordem: 99,
     publicado: false,
   }
 }
 
-function FormularioPortfolio({
-  item,
+function FormularioPortfolioGrupo({
+  grupo,
   onFechar,
   onSalvo,
 }: {
-  item: PortfolioItem | null
+  grupo: PortfolioGrupo | null
   onFechar: () => void
   onSalvo: () => void
 }) {
-  const init = valoresIniciais(item)
-  const [titulo, setTitulo] = useState(init.titulo)
+  const init = valoresIniciais(grupo)
+  const [nome, setNome] = useState(init.nome)
   const [descricao, setDescricao] = useState(init.descricao)
   const [urlImagem, setUrlImagem] = useState(init.urlImagem)
-  const [urlLoja, setUrlLoja] = useState(init.urlLoja)
-  const [grupoId, setGrupoId] = useState(init.grupoId)
   const [ordem, setOrdem] = useState(init.ordem)
   const [publicado, setPublicado] = useState(init.publicado)
   const [erro, setErro] = useState('')
@@ -71,26 +55,21 @@ function FormularioPortfolio({
   const salvar = useMutation({
     mutationFn: async () => {
       if (!supabase) throw new Error('Supabase não configurado')
-      if (!urlImagem) throw new Error('Selecione uma imagem')
-      if (urlLoja.trim() && !urlValida(urlLoja.trim())) {
-        throw new Error('Link da loja inválido. Use http:// ou https://')
-      }
+      if (!nome.trim()) throw new Error('Informe o nome do grupo')
 
       const payload = {
-        titulo,
-        descricao: descricao || null,
-        urlImagem,
-        urlLoja: urlLoja.trim() || null,
-        grupoId: grupoId || null,
+        nome: nome.trim(),
+        descricao: descricao.trim() || null,
+        urlImagem: urlImagem.trim() || null,
         ordem,
         publicado,
       }
 
-      if (item) {
-        const { error } = await supabase.from('PortfolioItem').update(payload).eq('id', item.id)
+      if (grupo) {
+        const { error } = await supabase.from('PortfolioGrupo').update(payload).eq('id', grupo.id)
         if (error) throw error
       } else {
-        const { error } = await supabase.from('PortfolioItem').insert(payload)
+        const { error } = await supabase.from('PortfolioGrupo').insert(payload)
         if (error) throw error
       }
     },
@@ -100,12 +79,12 @@ function FormularioPortfolio({
 
   const excluir = useMutation({
     mutationFn: async () => {
-      if (!supabase || !item) throw new Error('Item inválido')
-      if (!confirm(`Excluir "${item.titulo}"? Esta ação não pode ser desfeita.`)) return
-      if (extrairCaminhoStorage(item.urlImagem)) {
-        await removerImagemCms(item.urlImagem)
+      if (!supabase || !grupo) throw new Error('Grupo inválido')
+      if (!confirm(`Excluir o grupo "${grupo.nome}"? Os itens ficarão sem grupo.`)) return
+      if (urlImagem && extrairCaminhoStorage(urlImagem)) {
+        await removerImagemCms(urlImagem)
       }
-      const { error } = await supabase.from('PortfolioItem').delete().eq('id', item.id)
+      const { error } = await supabase.from('PortfolioGrupo').delete().eq('id', grupo.id)
       if (error) throw error
     },
     onSuccess: () => { onSalvo(); onFechar() },
@@ -116,38 +95,31 @@ function FormularioPortfolio({
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); salvar.mutate() }} className="space-y-3">
-      <CampoImagemCms
-        valor={urlImagem}
-        onChange={setUrlImagem}
-        preset="portfolio"
-        rotulo="Imagem"
-        obrigatorio
-      />
-      <Input rotulo="Título" value={titulo} onChange={(e) => setTitulo(e.target.value)} required />
-      <CampoGrupoPortfolio valor={grupoId} onChange={setGrupoId} />
+      <Input rotulo="Nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
       <label className="flex flex-col gap-1 text-sm">
-        <span className="text-[var(--texto-secundario)]">Descrição</span>
+        <span className="text-[var(--texto-secundario)]">Descrição breve</span>
         <textarea
           value={descricao}
           onChange={(e) => setDescricao(e.target.value)}
           className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2 text-[var(--texto)]"
-          rows={4}
+          rows={3}
+          placeholder="Texto exibido no card do grupo na home"
         />
       </label>
-      <Input
-        rotulo="Link da loja"
-        value={urlLoja}
-        onChange={(e) => setUrlLoja(e.target.value)}
-        placeholder="https://shopee.com.br/..."
+      <CampoImagemCms
+        valor={urlImagem}
+        onChange={setUrlImagem}
+        preset="portfolio"
+        rotulo="Imagem do grupo"
       />
       <p className="text-xs text-[var(--texto-muted)]">
-        Opcional. Se preenchido, exibe o botão &quot;Quero esse&quot; no site.
+        Opcional. Se vazio, usa a imagem do primeiro item publicado do grupo.
       </p>
       <Input rotulo="Ordem" type="number" value={ordem} onChange={(e) => setOrdem(+e.target.value)} />
       <Checkbox rotulo="Publicado" checked={publicado} onChange={setPublicado} />
       {erro && <p className="text-sm text-erro">{erro}</p>}
       <div className="flex items-center justify-between gap-2">
-        {item ? (
+        {grupo ? (
           <Botao
             type="button"
             variante="fantasma"
@@ -155,7 +127,7 @@ function FormularioPortfolio({
             onClick={() => excluir.mutate()}
             disabled={pendente}
           >
-            {excluir.isPending ? 'Excluindo...' : 'Excluir item'}
+            {excluir.isPending ? 'Excluindo...' : 'Excluir grupo'}
           </Botao>
         ) : (
           <span />
@@ -164,7 +136,7 @@ function FormularioPortfolio({
           <Botao type="button" variante="fantasma" onClick={onFechar} disabled={pendente}>
             Cancelar
           </Botao>
-          <Botao type="submit" disabled={!titulo || !urlImagem || pendente}>
+          <Botao type="submit" disabled={!nome.trim() || pendente}>
             Salvar
           </Botao>
         </div>
@@ -173,13 +145,13 @@ function FormularioPortfolio({
   )
 }
 
-export function ModalPortfolio({ aberto, item, onFechar, onSalvo }: Props) {
+export function ModalPortfolioGrupo({ aberto, grupo, onFechar, onSalvo }: Props) {
   return (
-    <Modal aberto={aberto} onFechar={onFechar} titulo={item ? 'Editar item' : 'Novo item de portfólio'} largura="lg">
+    <Modal aberto={aberto} onFechar={onFechar} titulo={grupo ? 'Editar grupo' : 'Novo grupo de portfólio'} largura="lg">
       {aberto && (
-        <FormularioPortfolio
-          key={item?.id ?? 'novo'}
-          item={item}
+        <FormularioPortfolioGrupo
+          key={grupo?.id ?? 'novo'}
+          grupo={grupo}
           onFechar={onFechar}
           onSalvo={onSalvo}
         />

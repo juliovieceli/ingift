@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, ChevronRight, History, Lock, Pencil, Phone, Receipt, Trash2, User } from 'lucide-react'
+import { ArrowLeft, Bookmark, ChevronDown, ChevronRight, History, Lock, Pencil, Phone, Receipt, Trash2, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatarMoeda } from '@/lib/calculadora'
 import {
@@ -20,9 +20,12 @@ import {
 import { recalcularTotaisOrcamento } from '@/lib/orcamento'
 import { Botao } from '@/componentes/ui/Botao'
 import { Card } from '@/componentes/ui/Card'
+import { Input } from '@/componentes/ui/Input'
 import { Modal } from '@/componentes/ui/Modal'
 import { ModalCalculadora } from '@/funcionalidades/admin/modais/ModalCalculadora'
 import { ModalFaturarOrcamento } from '@/funcionalidades/admin/modais/ModalFaturarOrcamento'
+import { ModalSalvarModelo } from '@/funcionalidades/admin/modais/ModalSalvarModelo'
+import { modeloDeItemOrcamento, itemTemModeloCorrespondente, listarModelosPeca, salvarModeloDePeca } from '@/lib/itemOrcamentoModelo'
 import type { OrcamentoItemComComposicao } from '@/lib/orcamento'
 import type { OrcamentoItem, OrcamentoStatus } from '@/tipos/database'
 
@@ -50,6 +53,11 @@ export function PaginaDetalheOrcamento() {
   const [motivoLiberacao, setMotivoLiberacao] = useState('')
   const [erroLiberacao, setErroLiberacao] = useState('')
   const [perguntarFaturarAposStatus, setPerguntarFaturarAposStatus] = useState(false)
+  const [prazoEntrega, setPrazoEntrega] = useState('')
+  const [erroPrazoEntrega, setErroPrazoEntrega] = useState('')
+  const [itemSalvarModelo, setItemSalvarModelo] = useState<ItemComComposicao | null>(null)
+  const [erroSalvarModelo, setErroSalvarModelo] = useState('')
+  const [itensSalvosComoModelo, setItensSalvosComoModelo] = useState<Set<string>>(new Set())
 
   const abrirModal = (tipo: 'peca' | 'avulso', item: ItemComComposicao | null = null) => {
     setModalItem({ aberto: true, tipo, item })
@@ -105,6 +113,14 @@ export function PaginaDetalheOrcamento() {
         .eq('orcamentoId', id)
         .order('ordem')
       return (data ?? []) as ItemComComposicao[]
+    },
+  })
+
+  const modelosPeca = useQuery({
+    queryKey: ['modelos-peca'],
+    queryFn: async () => {
+      if (!supabase) return []
+      return listarModelosPeca(supabase)
     },
   })
 
@@ -258,6 +274,28 @@ export function PaginaDetalheOrcamento() {
     onError: (e) => setErroCliente(e instanceof Error ? e.message : 'Erro ao alterar cliente'),
   })
 
+  useEffect(() => {
+    setPrazoEntrega(orcamento.data?.prazoEntrega ?? '')
+    setErroPrazoEntrega('')
+  }, [orcamento.data?.id, orcamento.data?.prazoEntrega])
+
+  const salvarPrazoEntrega = useMutation({
+    mutationFn: async (valor: string) => {
+      if (!supabase || !id) throw new Error('Orçamento inválido')
+      const { error } = await supabase
+        .from('Orcamento')
+        .update({ prazoEntrega: valor || null })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setErroPrazoEntrega('')
+      qc.invalidateQueries({ queryKey: ['orcamento', id] })
+      qc.invalidateQueries({ queryKey: ['orcamentos'] })
+    },
+    onError: (e) => setErroPrazoEntrega(e instanceof Error ? e.message : 'Erro ao salvar previsão'),
+  })
+
   const excluirItem = useMutation({
     mutationFn: async (itemId: string) => {
       if (!supabase || !id) throw new Error('Orçamento inválido')
@@ -273,6 +311,23 @@ export function PaginaDetalheOrcamento() {
       qc.invalidateQueries({ queryKey: ['orcamentos'] })
     },
     onError: (e) => setErro(e instanceof Error ? e.message : 'Erro ao excluir'),
+  })
+
+  const salvarItemComoModelo = useMutation({
+    mutationFn: async (nome: string) => {
+      if (!supabase || !itemSalvarModelo) throw new Error('Item inválido')
+      const input = modeloDeItemOrcamento(nome, itemSalvarModelo, orcamento.data?.configuracaoImpressoraId)
+      await salvarModeloDePeca(supabase, input)
+    },
+    onSuccess: () => {
+      if (itemSalvarModelo) {
+        setItensSalvosComoModelo((prev) => new Set(prev).add(itemSalvarModelo.id))
+      }
+      qc.invalidateQueries({ queryKey: ['modelos-peca'] })
+      setItemSalvarModelo(null)
+      setErroSalvarModelo('')
+    },
+    onError: (e) => setErroSalvarModelo(e instanceof Error ? e.message : 'Erro ao salvar modelo'),
   })
 
   const excluirOrcamento = useMutation({
@@ -376,6 +431,29 @@ export function PaginaDetalheOrcamento() {
                   {o.Cliente.telefone}
                 </p>
               )}
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-4">
+                <p className="text-sm text-[var(--texto-muted)]">
+                  Lançamento:{' '}
+                  <span className="text-[var(--texto-secundario)]">
+                    {new Date(o.criadoEm).toLocaleDateString('pt-BR')}
+                  </span>
+                </p>
+                <div className="sm:max-w-xs">
+                  <Input
+                    rotulo="Previsão de entrega"
+                    type="date"
+                    value={prazoEntrega}
+                    onChange={(e) => setPrazoEntrega(e.target.value)}
+                    onBlur={() => {
+                      const atual = o.prazoEntrega ?? ''
+                      if (prazoEntrega === atual || salvarPrazoEntrega.isPending) return
+                      salvarPrazoEntrega.mutate(prazoEntrega)
+                    }}
+                    disabled={faturado || salvarPrazoEntrega.isPending}
+                    erro={erroPrazoEntrega}
+                  />
+                </div>
+              </div>
             </div>
             {travado && !faturado && (
               <p className="flex items-center gap-1.5 text-sm text-alerta">
@@ -491,9 +569,15 @@ export function PaginaDetalheOrcamento() {
             )}
           </div>
           {!bloqueado && (
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
               <Botao className="w-full sm:w-auto" onClick={() => abrirModal('peca')}>Adicionar peça</Botao>
               <Botao className="w-full sm:w-auto" variante="fantasma" onClick={() => abrirModal('avulso')}>Adicionar material</Botao>
+              <Link
+                to="/admin/orcamentos/modelos"
+                className="text-center text-sm text-secondary-600 hover:underline dark:text-secondary-400 sm:px-2"
+              >
+                Gerenciar modelos
+              </Link>
             </div>
           )}
         </div>
@@ -513,6 +597,9 @@ export function PaginaDetalheOrcamento() {
                       detalhe: `${c.quantidade} ${c.unidadeMedida}`,
                     }))
                 const expandido = expandidos.has(item.id)
+                const temModeloSalvo =
+                  itensSalvosComoModelo.has(item.id) ||
+                  itemTemModeloCorrespondente(item, modelosPeca.data ?? [])
 
                 return (
                   <div key={item.id}>
@@ -552,6 +639,25 @@ export function PaginaDetalheOrcamento() {
                       </span>
                       {!bloqueado && (
                         <div className="flex w-full items-center justify-end gap-1 sm:w-auto">
+                          {!isAvulso && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setErroSalvarModelo('')
+                                setItemSalvarModelo(item)
+                              }}
+                              className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg hover:bg-[var(--superficie-elevada)] ${
+                                temModeloSalvo
+                                  ? 'text-secondary-500 dark:text-primary-400'
+                                  : 'text-[var(--texto-muted)]'
+                              }`}
+                              aria-label={temModeloSalvo ? 'Modelo salvo' : 'Salvar como modelo'}
+                              title={temModeloSalvo ? 'Modelo salvo — clique para salvar outra versão' : 'Salvar como modelo'}
+                            >
+                              <Bookmark className={`h-4 w-4 ${temModeloSalvo ? 'fill-current' : ''}`} />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); abrirItem(item) }}
@@ -732,6 +838,15 @@ export function PaginaDetalheOrcamento() {
           ordemInicial={listaItens.length}
         />
       )}
+
+      <ModalSalvarModelo
+        aberto={Boolean(itemSalvarModelo)}
+        nomeSugerido={itemSalvarModelo?.nomePeca ?? ''}
+        onFechar={() => { setItemSalvarModelo(null); setErroSalvarModelo('') }}
+        onSalvar={(nome) => salvarItemComoModelo.mutate(nome)}
+        salvando={salvarItemComoModelo.isPending}
+        erro={erroSalvarModelo}
+      />
 
       <ModalFaturarOrcamento
         aberto={modalFaturar}

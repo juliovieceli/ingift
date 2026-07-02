@@ -10,7 +10,7 @@ import { SecaoSobre } from './SecaoSobre'
 import { SecaoContato } from './SecaoContato'
 
 export function PaginaInicial() {
-  const { secao, portfolio, contato } = useLandingDados()
+  const { secao, portfolioGrupos, portfolio, contato } = useLandingDados()
   const hero = parseConteudoHero(secao('hero')?.conteudo)
   const marca = parseConteudoMarca(secao('marca')?.conteudo)
   const servicosItens = parseConteudoServicos(secao('servicos')?.conteudo)
@@ -36,6 +36,7 @@ export function PaginaInicial() {
       <SecaoPortfolio
         titulo={secao('portfolio')?.titulo ?? 'Portfólio'}
         subtitulo={portfolioSecao?.subtitulo}
+        grupos={portfolioGrupos.data ?? []}
         itens={portfolio.data ?? []}
       />
       <SecaoSobre

@@ -26,6 +26,9 @@ const PaginaOrcamentos = lazy(() =>
 const PaginaDetalheOrcamento = lazy(() =>
   import('@/funcionalidades/admin/PaginaDetalheOrcamento').then((m) => ({ default: m.PaginaDetalheOrcamento }))
 )
+const PaginaModelosPeca = lazy(() =>
+  import('@/funcionalidades/admin/PaginaModelosPeca').then((m) => ({ default: m.PaginaModelosPeca }))
+)
 const PaginaEstoque = lazy(() =>
   import('@/funcionalidades/admin/PaginaEstoque').then((m) => ({ default: m.PaginaEstoque }))
 )
@@ -90,6 +93,7 @@ export default function App() {
               />
               <Route path="clientes" element={<Suspense fallback={<Carregando />}><PaginaClientes /></Suspense>} />
               <Route path="orcamentos" element={<Suspense fallback={<Carregando />}><PaginaOrcamentos /></Suspense>} />
+              <Route path="orcamentos/modelos" element={<Suspense fallback={<Carregando />}><PaginaModelosPeca /></Suspense>} />
               <Route path="orcamentos/:id" element={<Suspense fallback={<Carregando />}><PaginaDetalheOrcamento /></Suspense>} />
               <Route path="cms" element={<Suspense fallback={<Carregando />}><PaginaCms /></Suspense>} />
               <Route path="estoque" element={<Suspense fallback={<Carregando />}><PaginaEstoque /></Suspense>} />

@@ -1,10 +1,10 @@
 import { buscarDadosLanding } from '@/lib/landingApi'
 import { parseConteudo } from '@/lib/parseConteudo'
-import type { PortfolioItem, SecaoLanding } from '@/tipos/database'
+import type { PortfolioGrupo, PortfolioItem, SecaoLanding } from '@/tipos/database'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import type { ContatoLanding } from './contatoLanding'
-import { portfolioFallback, secoesFallback } from './dadosFallback'
+import { portfolioFallback, portfolioGruposFallback, secoesFallback } from './dadosFallback'
 
 /** Tempo máximo de splash antes de exibir conteúdo padrão (ms) */
 export const LANDING_TIMEOUT_FALLBACK_MS = 3500
@@ -13,11 +13,13 @@ const agora = () => new Date().toISOString()
 
 type DadosLandingNormalizados = {
   secoes: SecaoLanding[]
+  portfolioGrupos: PortfolioGrupo[]
   portfolio: PortfolioItem[]
 }
 
 const dadosFallbackNormalizados: DadosLandingNormalizados = {
   secoes: secoesFallback,
+  portfolioGrupos: portfolioGruposFallback,
   portfolio: portfolioFallback,
 }
 
@@ -36,8 +38,26 @@ function normalizarSecoes(
   }))
 }
 
+function normalizarPortfolioGrupos(
+  grupos: { id: string; nome: string; descricao: string | null; urlImagem: string | null; ordem: number }[],
+): PortfolioGrupo[] {
+  const ts = agora()
+  return grupos.map((g) => ({
+    id: g.id,
+    nome: g.nome,
+    descricao: g.descricao,
+    urlImagem: g.urlImagem,
+    publicado: true,
+    ordem: g.ordem,
+    criadoEm: ts,
+    atualizadoEm: ts,
+    criadoPor: null,
+    atualizadoPor: null,
+  }))
+}
+
 function normalizarPortfolio(
-  itens: { id: string; titulo: string; descricao: string | null; urlImagem: string; urlLoja: string | null; grupo: string | null; ordem: number }[],
+  itens: { id: string; titulo: string; descricao: string | null; urlImagem: string; urlLoja: string | null; grupoId: string | null; ordem: number }[],
 ): PortfolioItem[] {
   const ts = agora()
   return itens.map((p) => ({
@@ -46,7 +66,7 @@ function normalizarPortfolio(
     descricao: p.descricao,
     urlImagem: p.urlImagem,
     urlLoja: p.urlLoja,
-    grupo: p.grupo,
+    grupoId: p.grupoId,
     publicado: true,
     ordem: p.ordem,
     criadoEm: ts,
@@ -69,6 +89,9 @@ export function useLandingDados() {
 
       return {
         secoes: normalizarSecoes(dados.secoes),
+        portfolioGrupos: dados.portfolioGrupos.length
+          ? normalizarPortfolioGrupos(dados.portfolioGrupos)
+          : portfolioGruposFallback,
         portfolio: dados.portfolio.length
           ? normalizarPortfolio(dados.portfolio)
           : portfolioFallback,
@@ -101,6 +124,7 @@ export function useLandingDados() {
   return {
     carregando,
     secoes: { data: dados?.secoes, isLoading: carregando },
+    portfolioGrupos: { data: dados?.portfolioGrupos, isLoading: carregando },
     portfolio: { data: dados?.portfolio, isLoading: carregando },
     secao,
     contato,

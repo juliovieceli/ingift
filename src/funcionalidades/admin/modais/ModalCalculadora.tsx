@@ -4,6 +4,8 @@ import { Botao } from '@/componentes/ui/Botao'
 import { Modal } from '@/componentes/ui/Modal'
 import { FormularioItemAvulso } from '@/funcionalidades/admin/FormularioItemAvulso'
 import { FormularioPecaOrcamento, pecaVazia, validarPecaOrcamento, type ErrosPecaOrcamento } from '@/funcionalidades/admin/FormularioPecaOrcamento'
+import { ModalDivergenciaPrecos } from '@/funcionalidades/admin/modais/ModalDivergenciaPrecos'
+import { ModalSalvarModelo } from '@/funcionalidades/admin/modais/ModalSalvarModelo'
 import { PainelConfigCalculadora } from '@/funcionalidades/admin/PainelConfigCalculadora'
 import { PainelParamsMargem } from '@/funcionalidades/admin/PainelParamsMargem'
 import {
@@ -21,6 +23,15 @@ import {
   mensagemFaltaEstoque,
   verificarDisponibilidadeMateriais,
 } from '@/lib/estoque'
+import {
+  aplicarModeloComEscolha,
+  compararModeloComPrecosAtuais,
+  listarModelosPeca,
+  salvarModeloDePeca,
+  type DivergenciaPreco,
+  type EscolhaPrecosModelo,
+  type ItemOrcamentoModeloComComposicao,
+} from '@/lib/itemOrcamentoModelo'
 import {
   atualizarItemAvulso,
   atualizarOrcamentoItem,
@@ -70,6 +81,12 @@ export function ModalCalculadora({
   const [params, setParams] = useState<ParamsMargemItem>(paramsMargemDeConfig(config))
   const [erro, setErro] = useState('')
   const [errosCampo, setErrosCampo] = useState<ErrosPecaOrcamento>({})
+  const [modeloSelecionadoId, setModeloSelecionadoId] = useState('')
+  const [modeloPendente, setModeloPendente] = useState<ItemOrcamentoModeloComComposicao | null>(null)
+  const [divergencias, setDivergencias] = useState<DivergenciaPreco[]>([])
+  const [modalDivergencia, setModalDivergencia] = useState(false)
+  const [modalSalvarModelo, setModalSalvarModelo] = useState(false)
+  const [erroSalvarModelo, setErroSalvarModelo] = useState('')
 
   const impressoras = useQuery({
     queryKey: ['impressoras'],
@@ -78,6 +95,15 @@ export function ModalCalculadora({
       if (!supabase) return []
       const { data } = await supabase.from('ImpressoraConfiguracao').select('*').eq('ativo', true).order('nome')
       return (data ?? []) as ImpressoraConfiguracao[]
+    },
+  })
+
+  const modelos = useQuery({
+    queryKey: ['modelos-peca'],
+    enabled: aberto && tipoItem === 'peca',
+    queryFn: async () => {
+      if (!supabase) return []
+      return listarModelosPeca(supabase)
     },
   })
 
@@ -105,15 +131,24 @@ export function ModalCalculadora({
     },
   })
 
+  const impressoraAtual = useMemo(() => {
+    const lista = impressoras.data ?? []
+    if (impressoraId) return lista.find((i) => i.id === impressoraId) ?? lista[0]
+    return lista[0]
+  }, [impressoras.data, impressoraId])
+
   useEffect(() => {
     if (!aberto) return
     setErro('')
     setErrosCampo({})
+    setModeloSelecionadoId('')
+    setModeloPendente(null)
+    setDivergencias([])
+    setModalDivergencia(false)
+    setModalSalvarModelo(false)
+    setErroSalvarModelo('')
 
     if (itemEdicao) {
-      // Restaura a config (máquina/energia/margens) que foi usada e gravada
-      // no item — sem isso o modal fica com o que estava no estado global
-      // (ex.: impressora selecionada da última vez), causando diferenças.
       impressoraCalculoStore.setConfig(configDeItem(itemEdicao))
 
       if (tipoItem === 'peca') {
@@ -141,9 +176,6 @@ export function ModalCalculadora({
     if (!aberto || !impressoras.data) return
 
     if (itemEdicao) {
-      // O item não guarda o id da impressora usada, só o snapshot numérico —
-      // tentamos reencontrar a impressora que combina com esses valores só
-      // para reselecionar o dropdown; a config em si já foi restaurada acima.
       const configItem = configDeItem(itemEdicao)
       const impressoraUsada = impressoras.data.find((i) => impressoraCombinaConfig(i, configItem))
       impressoraCalculoStore.setImpressoraId(impressoraUsada?.id ?? '')
@@ -154,6 +186,68 @@ export function ModalCalculadora({
     const imp = impId ? impressoras.data.find((i) => i.id === impId) : impressoras.data[0]
     if (imp) impressoraCalculoStore.aplicarImpressora(imp)
   }, [aberto, impressoras.data, orcamento.data, itemEdicao])
+
+  const aplicarModeloNoFormulario = (
+    modelo: ItemOrcamentoModeloComComposicao,
+    escolha: EscolhaPrecosModelo,
+  ) => {
+    const mats = materiais.data ?? []
+    const { peca: p, config: c, params: pm } = aplicarModeloComEscolha(
+      modelo,
+      escolha,
+      mats,
+      impressoraAtual,
+    )
+    setPeca(clonarPeca(p))
+    impressoraCalculoStore.setConfig(c)
+    setParams(pm)
+
+    if (escolha === 'modelo') {
+      if (modelo.configuracaoImpressoraId) {
+        impressoraCalculoStore.setImpressoraId(modelo.configuracaoImpressoraId)
+      } else {
+        const imp = impressoras.data?.find((i) => impressoraCombinaConfig(i, c))
+        impressoraCalculoStore.setImpressoraId(imp?.id ?? '')
+      }
+    }
+
+    setModeloSelecionadoId(modelo.id)
+    setErrosCampo({})
+    setErro('')
+  }
+
+  const selecionarModelo = (id: string) => {
+    setModeloSelecionadoId(id)
+    if (!id) return
+
+    const modelo = modelos.data?.find((m) => m.id === id)
+    if (!modelo) return
+
+    const divs = compararModeloComPrecosAtuais(modelo, materiais.data ?? [], impressoraAtual)
+    if (divs.length > 0) {
+      setModeloPendente(modelo)
+      setDivergencias(divs)
+      setModalDivergencia(true)
+      return
+    }
+
+    aplicarModeloNoFormulario(modelo, 'atuais')
+  }
+
+  const confirmarDivergencia = (escolha: EscolhaPrecosModelo) => {
+    if (!modeloPendente) return
+    aplicarModeloNoFormulario(modeloPendente, escolha)
+    setModeloPendente(null)
+    setDivergencias([])
+    setModalDivergencia(false)
+  }
+
+  const cancelarDivergencia = () => {
+    setModeloPendente(null)
+    setDivergencias([])
+    setModalDivergencia(false)
+    setModeloSelecionadoId('')
+  }
 
   const previewPeca = useMemo(() => {
     if (tipoItem !== 'peca' || !peca.nomePeca) return null
@@ -177,6 +271,11 @@ export function ModalCalculadora({
     if (tipoItem !== 'avulso' || !avulso.nome) return null
     return calcularItemAvulso(avulso, params)
   }, [tipoItem, avulso, params])
+
+  const pecaValidaParaModelo = useMemo(() => {
+    if (tipoItem !== 'peca') return false
+    return Object.keys(validarPecaOrcamento(peca)).length === 0
+  }, [tipoItem, peca])
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -213,6 +312,25 @@ export function ModalCalculadora({
       onFechar()
     },
     onError: (e) => setErro(e instanceof Error ? e.message : 'Erro ao salvar'),
+  })
+
+  const salvarModelo = useMutation({
+    mutationFn: async (nome: string) => {
+      if (!supabase) throw new Error('Supabase não configurado')
+      await salvarModeloDePeca(supabase, {
+        nome,
+        peca,
+        config,
+        params,
+        configuracaoImpressoraId: impressoraId || null,
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['modelos-peca'] })
+      setModalSalvarModelo(false)
+      setErroSalvarModelo('')
+    },
+    onError: (e) => setErroSalvarModelo(e instanceof Error ? e.message : 'Erro ao salvar modelo'),
   })
 
   const limparErro = (chave: string) => {
@@ -255,6 +373,17 @@ export function ModalCalculadora({
     salvar.mutate()
   }
 
+  const abrirSalvarModelo = () => {
+    const erros = validarPecaOrcamento(peca)
+    if (Object.keys(erros).length > 0) {
+      setErrosCampo(erros)
+      setErro('Preencha a peça antes de salvar como modelo.')
+      return
+    }
+    setErroSalvarModelo('')
+    setModalSalvarModelo(true)
+  }
+
   const titulo = itemEdicao
     ? tipoItem === 'peca' ? 'Editar peça' : 'Editar material / serviço'
     : tipoItem === 'peca' ? 'Adicionar peça' : 'Adicionar material / serviço'
@@ -262,52 +391,92 @@ export function ModalCalculadora({
   const preview = tipoItem === 'peca' ? previewPeca : previewAvulso
 
   return (
-    <Modal aberto={aberto} onFechar={onFechar} titulo={titulo} largura="2xl">
-      <div className="space-y-6">
-        <PainelConfigCalculadora
-          onConfigAlterada={() => {
-            // Ao editar, os parâmetros de margem já vêm do item (params) e
-            // não devem ser sobrescritos só porque a config da impressora
-            // foi tocada (ex.: ajustar consumo de kWh não deve zerar
-            // desconto/adicional do item).
-            if (!itemEdicao) setParams(paramsMargemDeConfig(config))
-          }}
-        />
-
-        {tipoItem === 'peca' ? (
-          <FormularioPecaOrcamento
-            config={config}
-            peca={peca}
-            onChange={setPeca}
-            resultado={previewPeca}
-            materiais={materiais.data ?? []}
-            mostrarCalcular={false}
-            erros={errosCampo}
-            onLimparErro={limparErro}
+    <>
+      <Modal aberto={aberto} onFechar={onFechar} titulo={titulo} largura="2xl">
+        <div className="space-y-6">
+          <PainelConfigCalculadora
+            onConfigAlterada={() => {
+              if (!itemEdicao) setParams(paramsMargemDeConfig(config))
+            }}
           />
-        ) : (
-          <FormularioItemAvulso avulso={avulso} onChange={setAvulso} materiais={materiais.data ?? []} />
-        )}
 
-        {(tipoItem === 'peca' || avulso.aplicarMargem) && (
-          <PainelParamsMargem
-            params={params}
-            onChange={setParams}
-            precoFinal={preview?.precoFinal}
-            lucroEfetivo={preview?.lucroEfetivo}
-            margemEfetiva={preview?.margemEfetiva}
-          />
-        )}
+          {tipoItem === 'peca' && !itemEdicao && (modelos.data?.length ?? 0) > 0 && (
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-[var(--texto-secundario)]">Usar modelo salvo</span>
+              <select
+                value={modeloSelecionadoId}
+                onChange={(e) => selecionarModelo(e.target.value)}
+                className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2 text-[var(--texto)]"
+              >
+                <option value="">Selecione um modelo...</option>
+                {(modelos.data ?? []).map((m) => (
+                  <option key={m.id} value={m.id}>{m.nome}</option>
+                ))}
+              </select>
+            </label>
+          )}
 
-        {erro && <p className="text-sm text-erro">{erro}</p>}
+          {tipoItem === 'peca' ? (
+            <FormularioPecaOrcamento
+              config={config}
+              peca={peca}
+              onChange={setPeca}
+              resultado={previewPeca}
+              materiais={materiais.data ?? []}
+              mostrarCalcular={false}
+              erros={errosCampo}
+              onLimparErro={limparErro}
+            />
+          ) : (
+            <FormularioItemAvulso avulso={avulso} onChange={setAvulso} materiais={materiais.data ?? []} />
+          )}
 
-        <div className="flex justify-end gap-2">
-          <Botao type="button" variante="fantasma" onClick={onFechar}>Cancelar</Botao>
-          <Botao type="button" onClick={tentarSalvar} disabled={salvar.isPending}>
-            {salvar.isPending ? 'Salvando...' : itemEdicao ? 'Salvar alterações' : 'Adicionar ao orçamento'}
-          </Botao>
+          {(tipoItem === 'peca' || avulso.aplicarMargem) && (
+            <PainelParamsMargem
+              params={params}
+              onChange={setParams}
+              precoFinal={preview?.precoFinal}
+              lucroEfetivo={preview?.lucroEfetivo}
+              margemEfetiva={preview?.margemEfetiva}
+            />
+          )}
+
+          {erro && <p className="text-sm text-erro">{erro}</p>}
+
+          <div className="flex flex-wrap justify-end gap-2">
+            {tipoItem === 'peca' && pecaValidaParaModelo && (
+              <Botao
+                type="button"
+                variante="fantasma"
+                onClick={abrirSalvarModelo}
+                className="mr-auto sm:mr-0"
+              >
+                Salvar como modelo
+              </Botao>
+            )}
+            <Botao type="button" variante="fantasma" onClick={onFechar}>Cancelar</Botao>
+            <Botao type="button" onClick={tentarSalvar} disabled={salvar.isPending}>
+              {salvar.isPending ? 'Salvando...' : itemEdicao ? 'Salvar alterações' : 'Adicionar ao orçamento'}
+            </Botao>
+          </div>
         </div>
-      </div>
-    </Modal>
+      </Modal>
+
+      <ModalDivergenciaPrecos
+        aberto={modalDivergencia}
+        divergencias={divergencias}
+        onCancelar={cancelarDivergencia}
+        onAplicar={confirmarDivergencia}
+      />
+
+      <ModalSalvarModelo
+        aberto={modalSalvarModelo}
+        nomeSugerido={peca.nomePeca}
+        onFechar={() => setModalSalvarModelo(false)}
+        onSalvar={(nome) => salvarModelo.mutate(nome)}
+        salvando={salvarModelo.isPending}
+        erro={erroSalvarModelo}
+      />
+    </>
   )
 }

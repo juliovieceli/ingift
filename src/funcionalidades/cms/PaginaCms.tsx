@@ -4,14 +4,16 @@ import { supabase } from '@/lib/supabase'
 import { Botao } from '@/componentes/ui/Botao'
 import { TabelaDados } from '@/componentes/ui/TabelaDados'
 import { ModalPortfolio } from '@/funcionalidades/cms/modais/ModalPortfolio'
+import { ModalPortfolioGrupo } from '@/funcionalidades/cms/modais/ModalPortfolioGrupo'
 import { ModalSecao } from '@/funcionalidades/cms/modais/ModalSecao'
 import { NOMES_SECAO, normalizarSlug } from '@/funcionalidades/cms/secaoCms'
+import { urlImagemGrupo } from '@/funcionalidades/landing/portfolioGrupo'
 import { parseConteudo } from '@/lib/parseConteudo'
 import { parseConteudoServicos } from '@/funcionalidades/landing/conteudoServicos'
 import { parseConteudoMarca } from '@/funcionalidades/landing/conteudoMarca'
-import type { PortfolioItem, SecaoLanding } from '@/tipos/database'
+import type { PortfolioGrupo, PortfolioItem, SecaoLanding } from '@/tipos/database'
 
-type Aba = 'secoes' | 'portfolio'
+type Aba = 'secoes' | 'grupos' | 'portfolio'
 
 function previewSecao(secao: SecaoLanding): string {
   const c = parseConteudo(secao.conteudo)
@@ -53,6 +55,10 @@ export function PaginaCms() {
     aberto: false,
     item: null,
   })
+  const [modalGrupo, setModalGrupo] = useState<{ aberto: boolean; grupo: PortfolioGrupo | null }>({
+    aberto: false,
+    grupo: null,
+  })
 
   const secoes = useQuery({
     queryKey: ['cms-secoes'],
@@ -61,6 +67,16 @@ export function PaginaCms() {
       const { data, error } = await supabase.from('SecaoLanding').select('*').order('ordem')
       if (error) throw error
       return (data ?? []) as SecaoLanding[]
+    },
+  })
+
+  const grupos = useQuery({
+    queryKey: ['cms-portfolio-grupos'],
+    queryFn: async () => {
+      if (!supabase) return []
+      const { data, error } = await supabase.from('PortfolioGrupo').select('*').order('ordem')
+      if (error) throw error
+      return (data ?? []) as PortfolioGrupo[]
     },
   })
 
@@ -85,6 +101,9 @@ export function PaginaCms() {
     setModalSecao({ aberto: true, secao })
   }, [])
 
+  const nomesGrupo = new Map((grupos.data ?? []).map((g) => [g.id, g.nome]))
+  const itens = portfolio.data ?? []
+
   const linhasSecoes = (secoes.data ?? []).map((secao) => ({
     id: secao.id,
     slug: secao.slug,
@@ -97,9 +116,12 @@ export function PaginaCms() {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-[var(--texto)]">Conteúdo do site</h2>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Botao variante={aba === 'secoes' ? 'primario' : 'fantasma'} onClick={() => setAba('secoes')}>
           Seções
+        </Botao>
+        <Botao variante={aba === 'grupos' ? 'primario' : 'fantasma'} onClick={() => setAba('grupos')}>
+          Grupos
         </Botao>
         <Botao variante={aba === 'portfolio' ? 'primario' : 'fantasma'} onClick={() => setAba('portfolio')}>
           Portfólio
@@ -160,6 +182,64 @@ export function PaginaCms() {
         </>
       )}
 
+      {aba === 'grupos' && (
+        <>
+          <div className="flex justify-end">
+            <Botao onClick={() => setModalGrupo({ aberto: true, grupo: null })}>Novo grupo</Botao>
+          </div>
+          {grupos.isError && (
+            <p className="text-sm text-erro">
+              Erro ao carregar grupos: {grupos.error instanceof Error ? grupos.error.message : 'Erro desconhecido'}
+            </p>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {grupos.data?.map((grupo) => {
+              const imagem = urlImagemGrupo(grupo, itens)
+              return (
+                <button
+                  key={grupo.id}
+                  type="button"
+                  onClick={() => setModalGrupo({ aberto: true, grupo })}
+                  className="flex h-full flex-col overflow-hidden rounded-xl border border-[var(--borda)] bg-[var(--superficie)] text-left transition hover:border-secondary-500/50"
+                >
+                  {imagem ? (
+                    <img
+                      src={imagem}
+                      alt={grupo.nome}
+                      className="aspect-video w-full shrink-0 object-cover"
+                    />
+                  ) : (
+                    <div className="flex aspect-video w-full shrink-0 items-center justify-center bg-[var(--superficie-elevada)] text-sm text-[var(--texto-muted)]">
+                      Sem imagem
+                    </div>
+                  )}
+                  <div className="flex flex-1 flex-col p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="line-clamp-2 min-h-11 flex-1 font-semibold leading-snug text-[var(--texto)]">
+                        {grupo.nome}
+                      </h3>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
+                          grupo.publicado
+                            ? 'bg-sucesso/15 text-sucesso'
+                            : 'bg-[var(--superficie-elevada)] text-[var(--texto-muted)]'
+                        }`}
+                      >
+                        {grupo.publicado ? 'Publicado' : 'Rascunho'}
+                      </span>
+                    </div>
+                    {grupo.descricao && (
+                      <p className="mt-1 line-clamp-2 text-sm text-[var(--texto-muted)]">{grupo.descricao}</p>
+                    )}
+                    <p className="mt-auto pt-2 text-xs text-[var(--texto-muted)]">Ordem: {grupo.ordem}</p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+
       {aba === 'portfolio' && (
         <>
           <div className="flex justify-end">
@@ -198,6 +278,11 @@ export function PaginaCms() {
                       {item.publicado ? 'Publicado' : 'Rascunho'}
                     </span>
                   </div>
+                  {item.grupoId && (
+                    <p className="mt-1 text-xs text-[var(--texto-muted)]">
+                      Grupo: {nomesGrupo.get(item.grupoId) ?? '—'}
+                    </p>
+                  )}
                   <p className="mt-auto pt-2 text-xs text-[var(--texto-muted)]">Ordem: {item.ordem}</p>
                 </div>
               </button>
@@ -210,6 +295,13 @@ export function PaginaCms() {
         aberto={modalSecao.aberto}
         secao={modalSecao.secao}
         onFechar={() => setModalSecao({ aberto: false, secao: null })}
+        onSalvo={invalidar}
+      />
+
+      <ModalPortfolioGrupo
+        aberto={modalGrupo.aberto}
+        grupo={modalGrupo.grupo}
+        onFechar={() => setModalGrupo({ aberto: false, grupo: null })}
         onSalvo={invalidar}
       />
 

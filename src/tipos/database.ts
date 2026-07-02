@@ -83,13 +83,25 @@ export interface Database {
         atualizadoEm: string
         atualizadoPor: string | null
       }>
+      PortfolioGrupo: Tabela<{
+        id: string
+        nome: string
+        descricao: string | null
+        urlImagem: string | null
+        publicado: boolean
+        ordem: number
+        criadoEm: string
+        atualizadoEm: string
+        criadoPor: string | null
+        atualizadoPor: string | null
+      }>
       PortfolioItem: Tabela<{
         id: string
         titulo: string
         descricao: string | null
         urlImagem: string
         urlLoja: string | null
-        grupo: string | null
+        grupoId: string | null
         publicado: boolean
         ordem: number
         criadoEm: string
@@ -275,6 +287,44 @@ export interface Database {
         alteradoEm: string
         alteradoPor: string | null
       }>
+      ItemOrcamentoModelo: Tabela<{
+        id: string
+        nome: string
+        nomePeca: string
+        tempoHoras: number
+        tempoMinutos: number
+        quantidade: number
+        observacoes: string | null
+        configuracaoImpressoraId: string | null
+        consumoKwh: number
+        precoKwh: number
+        valorMaquina: number
+        vidaUtilHoras: number
+        taxaFalha: number
+        margemMultiplicador: number
+        taxaMarketplace: number
+        adicional: number
+        desconto: number
+        ativo: boolean
+        criadoEm: string
+        atualizadoEm: string
+        criadoPor: string | null
+        atualizadoPor: string | null
+      }>
+      ItemOrcamentoModeloComposicao: Tabela<{
+        id: string
+        modeloItemId: string
+        materialId: string
+        categoria: string
+        descricao: string | null
+        tipo: string | null
+        cor: string | null
+        quantidade: number
+        unidadeMedida: string
+        custoUnitario: number
+        pesoG: number | null
+        ordem: number
+      }>
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -286,6 +336,7 @@ export type ImpressoraConfiguracao = Database['public']['Tables']['ImpressoraCon
 export type Cliente = Database['public']['Tables']['Cliente']['Row']
 export type OrcamentoStatus = Database['public']['Tables']['OrcamentoStatus']['Row']
 export type SecaoLanding = Database['public']['Tables']['SecaoLanding']['Row']
+export type PortfolioGrupo = Database['public']['Tables']['PortfolioGrupo']['Row']
 export type PortfolioItem = Database['public']['Tables']['PortfolioItem']['Row']
 export type Orcamento = Database['public']['Tables']['Orcamento']['Row']
 export type Material = Database['public']['Tables']['Material']['Row']
@@ -294,6 +345,8 @@ export type EstoqueTipoMovimentacao = Database['public']['Tables']['EstoqueTipoM
 export type OrcamentoItem = Database['public']['Tables']['OrcamentoItem']['Row']
 export type OrcamentoItemComposicao = Database['public']['Tables']['OrcamentoItemComposicao']['Row']
 export type OrcamentoHistoricoStatus = Database['public']['Tables']['OrcamentoHistoricoStatus']['Row']
+export type ItemOrcamentoModelo = Database['public']['Tables']['ItemOrcamentoModelo']['Row']
+export type ItemOrcamentoModeloComposicao = Database['public']['Tables']['ItemOrcamentoModeloComposicao']['Row']
 export type Perfil = Database['public']['Tables']['Perfil']['Row']
 export type FinanceiroPlanoConta = Database['public']['Tables']['FinanceiroPlanoConta']['Row']
 export type FinanceiroContaCaixa = Database['public']['Tables']['FinanceiroContaCaixa']['Row']
