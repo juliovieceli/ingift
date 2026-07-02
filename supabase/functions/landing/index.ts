@@ -42,12 +42,12 @@ Deno.serve(async (req) => {
         .order('ordem'),
       supabase
         .from('PortfolioGrupo')
-        .select('id, nome, descricao, urlImagem, ordem')
+        .select('id, nome, descricao, urlsImagem, ordem')
         .eq('publicado', true)
         .order('ordem'),
       supabase
         .from('PortfolioItem')
-        .select('id, titulo, descricao, urlImagem, urlLoja, grupoId, ordem')
+        .select('id, titulo, descricao, urlsImagem, urlLoja, ordem, PortfolioItemGrupo(grupoId)')
         .eq('publicado', true)
         .order('ordem'),
     ])
@@ -56,11 +56,31 @@ Deno.serve(async (req) => {
     if (gruposRes.error) throw gruposRes.error
     if (portfolioRes.error) throw portfolioRes.error
 
+    type ItemComGrupos = {
+      id: string
+      titulo: string
+      descricao: string | null
+      urlsImagem: string[]
+      urlLoja: string | null
+      ordem: number
+      PortfolioItemGrupo: { grupoId: string }[] | null
+    }
+
+    const portfolio = ((portfolioRes.data ?? []) as ItemComGrupos[]).map((item) => ({
+      id: item.id,
+      titulo: item.titulo,
+      descricao: item.descricao,
+      urlsImagem: item.urlsImagem,
+      urlLoja: item.urlLoja,
+      ordem: item.ordem,
+      grupoIds: (item.PortfolioItemGrupo ?? []).map((g) => g.grupoId),
+    }))
+
     return new Response(
       JSON.stringify({
         secoes: secoesRes.data ?? [],
         portfolioGrupos: gruposRes.data ?? [],
-        portfolio: portfolioRes.data ?? [],
+        portfolio,
       }),
       {
         headers: {

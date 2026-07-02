@@ -74,11 +74,11 @@ export function ModalRecorteImagem({ aberto, imagemSrc, preset, onFechar, onConf
             <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-[var(--borda)] bg-[var(--superficie-elevada)] p-4">
               <p className="text-xs font-medium text-[var(--texto-muted)]">Pré-visualização</p>
               <div className="flex flex-col items-center gap-3">
-                <div className="flex items-center gap-2 rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2">
-                  <img src={imagemSrc} alt="" className="h-10 w-auto max-w-[120px] object-contain" />
+                <div className="flex items-center gap-2 rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-1.5">
+                  <img src={imagemSrc} alt="" className="block h-auto w-auto max-w-[120px] object-contain" />
                   <span className="text-sm font-bold text-[var(--texto)]">Header</span>
                 </div>
-                <img src={imagemSrc} alt="" className="h-20 w-auto max-w-[160px] object-contain" />
+                <img src={imagemSrc} alt="" className="block h-auto w-auto max-w-[160px] object-contain" />
                 <span className="text-xs text-[var(--texto-muted)]">Hero</span>
               </div>
             </div>

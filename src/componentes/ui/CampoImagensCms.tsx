@@ -6,21 +6,21 @@ import { extrairCaminhoStorage, removerImagemCms } from '@/lib/storageImagem'
 
 const TAMANHO_MAX = 5 * 1024 * 1024
 const TIPOS_ACEITOS = ['image/jpeg', 'image/png', 'image/webp']
+const MAX_IMAGENS = 4
 
 interface Props {
-  valor: string
-  onChange: (url: string) => void
+  valor: string[]
+  onChange: (urls: string[]) => void
   preset: PresetRecorte
   rotulo?: string
   obrigatorio?: boolean
 }
 
-export function CampoImagemCms({ valor, onChange, preset, rotulo = 'Imagem', obrigatorio }: Props) {
+export function CampoImagensCms({ valor, onChange, preset, rotulo = 'Imagens', obrigatorio }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [recorteAberto, setRecorteAberto] = useState(false)
   const [imagemLocal, setImagemLocal] = useState<string | null>(null)
   const [erro, setErro] = useState('')
-  const urlAnteriorRef = useRef(valor)
 
   const abrirSeletor = () => inputRef.current?.click()
 
@@ -28,6 +28,11 @@ export function CampoImagemCms({ valor, onChange, preset, rotulo = 'Imagem', obr
     const arquivo = e.target.files?.[0]
     e.target.value = ''
     if (!arquivo) return
+
+    if (valor.length >= MAX_IMAGENS) {
+      setErro(`Máximo de ${MAX_IMAGENS} imagens.`)
+      return
+    }
 
     if (!TIPOS_ACEITOS.includes(arquivo.type)) {
       setErro('Formato inválido. Use JPEG, PNG ou WebP.')
@@ -45,12 +50,7 @@ export function CampoImagemCms({ valor, onChange, preset, rotulo = 'Imagem', obr
   }
 
   const aoConfirmarRecorte = async (urlNova: string) => {
-    const antiga = urlAnteriorRef.current
-    if (antiga && antiga !== urlNova && extrairCaminhoStorage(antiga)) {
-      await removerImagemCms(antiga)
-    }
-    urlAnteriorRef.current = urlNova
-    onChange(urlNova)
+    onChange([...valor, urlNova])
     if (imagemLocal) URL.revokeObjectURL(imagemLocal)
     setImagemLocal(null)
   }
@@ -63,50 +63,63 @@ export function CampoImagemCms({ valor, onChange, preset, rotulo = 'Imagem', obr
     }
   }
 
-  const remover = async () => {
-    if (valor && extrairCaminhoStorage(valor)) {
-      await removerImagemCms(valor)
+  const remover = async (indice: number) => {
+    const url = valor[indice]
+    if (url && extrairCaminhoStorage(url)) {
+      await removerImagemCms(url)
     }
-    urlAnteriorRef.current = ''
-    onChange('')
+    onChange(valor.filter((_, i) => i !== indice))
   }
 
   const previewClass =
     preset === 'portfolio'
-      ? 'aspect-square w-full max-w-xs object-cover'
-      : 'mx-auto block h-auto w-auto max-w-[200px] object-contain'
+      ? 'aspect-square w-full object-cover'
+      : 'mx-auto h-16 w-auto max-w-[200px] object-contain'
+
+  const podeAdicionar = valor.length < MAX_IMAGENS
 
   return (
     <div className="space-y-2">
       <span className="text-sm text-[var(--texto-secundario)]">
         {rotulo}
         {obrigatorio && <span className="text-erro"> *</span>}
+        <span className="ml-1 text-xs text-[var(--texto-muted)]">
+          ({valor.length}/{MAX_IMAGENS})
+        </span>
       </span>
 
-      {valor ? (
-        <div className="space-y-2">
-          <div className="overflow-hidden rounded-lg border border-[var(--borda)] bg-[var(--superficie-elevada)] p-2">
-            <img src={valor} alt="Preview" className={previewClass} />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Botao type="button" variante="fantasma" onClick={abrirSeletor}>
-              <ImagePlus className="h-4 w-4" />
-              Trocar imagem
-            </Botao>
-            <Botao type="button" variante="fantasma" onClick={remover}>
-              <Trash2 className="h-4 w-4" />
-              Remover
-            </Botao>
-          </div>
+      {valor.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {valor.map((url, i) => (
+            <div
+              key={`${url}-${i}`}
+              className="overflow-hidden rounded-lg border border-[var(--borda)] bg-[var(--superficie-elevada)] p-1.5"
+            >
+              <img src={url} alt={`Imagem ${i + 1}`} className={previewClass} />
+              <Botao
+                type="button"
+                variante="fantasma"
+                className="mt-1 w-full px-2 py-1 text-xs text-erro hover:bg-erro/10"
+                onClick={() => remover(i)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Remover
+              </Botao>
+            </div>
+          ))}
         </div>
-      ) : (
+      )}
+
+      {podeAdicionar && (
         <button
           type="button"
           onClick={abrirSeletor}
-          className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[var(--borda)] bg-[var(--superficie-elevada)] px-4 py-8 text-[var(--texto-muted)] transition hover:border-secondary-500 hover:text-[var(--texto-secundario)]"
+          className="flex w-full flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[var(--borda)] bg-[var(--superficie-elevada)] px-4 py-6 text-[var(--texto-muted)] transition hover:border-secondary-500 hover:text-[var(--texto-secundario)]"
         >
-          <ImagePlus className="h-8 w-8" />
-          <span className="text-sm">Selecionar imagem</span>
+          <ImagePlus className="h-6 w-6" />
+          <span className="text-sm">
+            {valor.length === 0 ? 'Selecionar imagem' : 'Adicionar imagem'}
+          </span>
         </button>
       )}
 
@@ -130,5 +143,12 @@ export function CampoImagemCms({ valor, onChange, preset, rotulo = 'Imagem', obr
         />
       )}
     </div>
+  )
+}
+
+/** Remove do storage todas as URLs CMS de um array. */
+export async function removerImagensCms(urls: string[]): Promise<void> {
+  await Promise.all(
+    urls.filter((u) => extrairCaminhoStorage(u)).map((u) => removerImagemCms(u)),
   )
 }

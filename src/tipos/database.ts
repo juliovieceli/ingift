@@ -87,7 +87,7 @@ export interface Database {
         id: string
         nome: string
         descricao: string | null
-        urlImagem: string | null
+        urlsImagem: string[]
         publicado: boolean
         ordem: number
         criadoEm: string
@@ -99,15 +99,18 @@ export interface Database {
         id: string
         titulo: string
         descricao: string | null
-        urlImagem: string
+        urlsImagem: string[]
         urlLoja: string | null
-        grupoId: string | null
         publicado: boolean
         ordem: number
         criadoEm: string
         atualizadoEm: string
         criadoPor: string | null
         atualizadoPor: string | null
+      }>
+      PortfolioItemGrupo: Tabela<{
+        itemId: string
+        grupoId: string
       }>
       Orcamento: Tabela<{
         id: string
@@ -338,6 +341,10 @@ export type OrcamentoStatus = Database['public']['Tables']['OrcamentoStatus']['R
 export type SecaoLanding = Database['public']['Tables']['SecaoLanding']['Row']
 export type PortfolioGrupo = Database['public']['Tables']['PortfolioGrupo']['Row']
 export type PortfolioItem = Database['public']['Tables']['PortfolioItem']['Row']
+export type PortfolioItemGrupo = Database['public']['Tables']['PortfolioItemGrupo']['Row']
+
+/** Item de portfólio com grupos agregados (view pública / landing). */
+export type PortfolioItemComGrupos = PortfolioItem & { grupoIds: string[] }
 export type Orcamento = Database['public']['Tables']['Orcamento']['Row']
 export type Material = Database['public']['Tables']['Material']['Row']
 export type EstoqueMovimentacao = Database['public']['Tables']['EstoqueMovimentacao']['Row']

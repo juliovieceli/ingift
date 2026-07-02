@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { CampoPesquisa } from '@/componentes/ui/CampoPesquisa'
 import { usePrefersMotion } from '@/hooks/usePrefersMotion'
 import { CardPortfolio } from '@/funcionalidades/landing/componentes/CardPortfolio'
-import { nomeGrupo } from '@/funcionalidades/landing/portfolioGrupo'
+import { nomesGrupo } from '@/funcionalidades/landing/portfolioGrupo'
 import { useLandingDados } from './useLandingDados'
 
 function normalizarBusca(texto: string): string {
@@ -46,12 +46,12 @@ export function PaginaPortfolio() {
   const itensFiltrados = useMemo(() => {
     const termo = normalizarBusca(busca)
     return itens.filter((item) => {
-      if (grupoAtivo && item.grupoId !== grupoAtivo) return false
+      if (grupoAtivo && !item.grupoIds.includes(grupoAtivo)) return false
       if (!termo) return true
       const titulo = item.titulo.toLowerCase()
       const descricao = (item.descricao ?? '').toLowerCase()
-      const grupo = (nomeGrupo(item.grupoId, grupos) ?? '').toLowerCase()
-      return titulo.includes(termo) || descricao.includes(termo) || grupo.includes(termo)
+      const nomes = nomesGrupo(item.grupoIds, grupos).join(' ').toLowerCase()
+      return titulo.includes(termo) || descricao.includes(termo) || nomes.includes(termo)
     })
   }, [itens, busca, grupoAtivo, grupos])
 
@@ -128,7 +128,7 @@ export function PaginaPortfolio() {
                 item={item}
                 idx={idx}
                 hoverCapaz={hoverCapaz}
-                nomeGrupo={nomeGrupo(item.grupoId, grupos)}
+                nomesGrupo={nomesGrupo(item.grupoIds, grupos)}
               />
             ))}
           </div>

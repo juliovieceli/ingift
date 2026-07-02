@@ -1,6 +1,6 @@
-import { buscarDadosLanding } from '@/lib/landingApi'
+import { buscarDadosLanding, type PortfolioGrupoLanding, type PortfolioItemLanding } from '@/lib/landingApi'
 import { parseConteudo } from '@/lib/parseConteudo'
-import type { PortfolioGrupo, PortfolioItem, SecaoLanding } from '@/tipos/database'
+import type { PortfolioGrupo, PortfolioItemComGrupos, SecaoLanding } from '@/tipos/database'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import type { ContatoLanding } from './contatoLanding'
@@ -14,7 +14,7 @@ const agora = () => new Date().toISOString()
 type DadosLandingNormalizados = {
   secoes: SecaoLanding[]
   portfolioGrupos: PortfolioGrupo[]
-  portfolio: PortfolioItem[]
+  portfolio: PortfolioItemComGrupos[]
 }
 
 const dadosFallbackNormalizados: DadosLandingNormalizados = {
@@ -38,15 +38,13 @@ function normalizarSecoes(
   }))
 }
 
-function normalizarPortfolioGrupos(
-  grupos: { id: string; nome: string; descricao: string | null; urlImagem: string | null; ordem: number }[],
-): PortfolioGrupo[] {
+function normalizarPortfolioGrupos(grupos: PortfolioGrupoLanding[]): PortfolioGrupo[] {
   const ts = agora()
   return grupos.map((g) => ({
     id: g.id,
     nome: g.nome,
     descricao: g.descricao,
-    urlImagem: g.urlImagem,
+    urlsImagem: g.urlsImagem ?? [],
     publicado: true,
     ordem: g.ordem,
     criadoEm: ts,
@@ -56,17 +54,15 @@ function normalizarPortfolioGrupos(
   }))
 }
 
-function normalizarPortfolio(
-  itens: { id: string; titulo: string; descricao: string | null; urlImagem: string; urlLoja: string | null; grupoId: string | null; ordem: number }[],
-): PortfolioItem[] {
+function normalizarPortfolio(itens: PortfolioItemLanding[]): PortfolioItemComGrupos[] {
   const ts = agora()
   return itens.map((p) => ({
     id: p.id,
     titulo: p.titulo,
     descricao: p.descricao,
-    urlImagem: p.urlImagem,
+    urlsImagem: p.urlsImagem ?? [],
     urlLoja: p.urlLoja,
-    grupoId: p.grupoId,
+    grupoIds: p.grupoIds ?? [],
     publicado: true,
     ordem: p.ordem,
     criadoEm: ts,

@@ -43,7 +43,7 @@ export function SecaoHero({ hero, marca, whatsapp }: Props) {
           <img
             src={marca.urlLogo}
             alt={marca.nomeMarca}
-            className="entrada-hero h-20 w-auto md:h-24"
+            className="entrada-hero block h-auto w-auto max-w-[min(100%,16rem)] object-contain"
             style={{ animationDelay: '0ms' }}
           />
         )}

@@ -7,11 +7,11 @@ import { ModalPortfolio } from '@/funcionalidades/cms/modais/ModalPortfolio'
 import { ModalPortfolioGrupo } from '@/funcionalidades/cms/modais/ModalPortfolioGrupo'
 import { ModalSecao } from '@/funcionalidades/cms/modais/ModalSecao'
 import { NOMES_SECAO, normalizarSlug } from '@/funcionalidades/cms/secaoCms'
-import { urlImagemGrupo } from '@/funcionalidades/landing/portfolioGrupo'
+import { urlsImagemGrupo } from '@/funcionalidades/landing/portfolioGrupo'
 import { parseConteudo } from '@/lib/parseConteudo'
 import { parseConteudoServicos } from '@/funcionalidades/landing/conteudoServicos'
 import { parseConteudoMarca } from '@/funcionalidades/landing/conteudoMarca'
-import type { PortfolioGrupo, PortfolioItem, SecaoLanding } from '@/tipos/database'
+import type { PortfolioGrupo, PortfolioItem, PortfolioItemComGrupos, SecaoLanding } from '@/tipos/database'
 
 type Aba = 'secoes' | 'grupos' | 'portfolio'
 
@@ -51,9 +51,14 @@ export function PaginaCms() {
     aberto: false,
     secao: null,
   })
-  const [modalPortfolio, setModalPortfolio] = useState<{ aberto: boolean; item: PortfolioItem | null }>({
+  const [modalPortfolio, setModalPortfolio] = useState<{
+    aberto: boolean
+    item: PortfolioItem | null
+    grupoIds: string[]
+  }>({
     aberto: false,
     item: null,
+    grupoIds: [],
   })
   const [modalGrupo, setModalGrupo] = useState<{ aberto: boolean; grupo: PortfolioGrupo | null }>({
     aberto: false,
@@ -90,10 +95,27 @@ export function PaginaCms() {
     },
   })
 
+  const itemGrupos = useQuery({
+    queryKey: ['cms-portfolio-item-grupos'],
+    queryFn: async () => {
+      if (!supabase) return new Map<string, string[]>()
+      const { data, error } = await supabase.from('PortfolioItemGrupo').select('itemId, grupoId')
+      if (error) throw error
+      const map = new Map<string, string[]>()
+      for (const row of data ?? []) {
+        const lista = map.get(row.itemId) ?? []
+        lista.push(row.grupoId)
+        map.set(row.itemId, lista)
+      }
+      return map
+    },
+  })
+
   const invalidar = () => {
     qc.invalidateQueries({ queryKey: ['cms-secoes'] })
     qc.invalidateQueries({ queryKey: ['cms-portfolio'] })
     qc.invalidateQueries({ queryKey: ['cms-portfolio-grupos'] })
+    qc.invalidateQueries({ queryKey: ['cms-portfolio-item-grupos'] })
     qc.invalidateQueries({ queryKey: ['landing'] })
   }
 
@@ -101,8 +123,22 @@ export function PaginaCms() {
     setModalSecao({ aberto: true, secao })
   }, [])
 
-  const nomesGrupo = new Map((grupos.data ?? []).map((g) => [g.id, g.nome]))
+  const nomesGrupoMap = new Map((grupos.data ?? []).map((g) => [g.id, g.nome]))
   const itens = portfolio.data ?? []
+  const gruposPorItem = itemGrupos.data ?? new Map<string, string[]>()
+
+  const itensComGrupos: PortfolioItemComGrupos[] = itens.map((item) => ({
+    ...item,
+    grupoIds: gruposPorItem.get(item.id) ?? [],
+  }))
+
+  const abrirItem = (item: PortfolioItem | null) => {
+    setModalPortfolio({
+      aberto: true,
+      item,
+      grupoIds: item ? (gruposPorItem.get(item.id) ?? []) : [],
+    })
+  }
 
   const linhasSecoes = (secoes.data ?? []).map((secao) => ({
     id: secao.id,
@@ -194,7 +230,8 @@ export function PaginaCms() {
           )}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {grupos.data?.map((grupo) => {
-              const imagem = urlImagemGrupo(grupo, itens)
+              const imagens = urlsImagemGrupo(grupo, itensComGrupos)
+              const imagem = imagens[0]
               return (
                 <button
                   key={grupo.id}
@@ -243,7 +280,7 @@ export function PaginaCms() {
       {aba === 'portfolio' && (
         <>
           <div className="flex justify-end">
-            <Botao onClick={() => setModalPortfolio({ aberto: true, item: null })}>Novo item</Botao>
+            <Botao onClick={() => abrirItem(null)}>Novo item</Botao>
           </div>
           {portfolio.isError && (
             <p className="text-sm text-erro">
@@ -251,18 +288,28 @@ export function PaginaCms() {
             </p>
           )}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {portfolio.data?.map((item) => (
+            {portfolio.data?.map((item) => {
+              const ids = gruposPorItem.get(item.id) ?? []
+              const nomes = ids.map((id) => nomesGrupoMap.get(id)).filter(Boolean).join(', ')
+              const preview = item.urlsImagem[0]
+              return (
               <button
                 key={item.id}
                 type="button"
-                onClick={() => setModalPortfolio({ aberto: true, item })}
+                onClick={() => abrirItem(item)}
                 className="flex h-full flex-col overflow-hidden rounded-xl border border-[var(--borda)] bg-[var(--superficie)] text-left transition hover:border-secondary-500/50"
               >
-                <img
-                  src={item.urlImagem}
-                  alt={item.titulo}
-                  className="aspect-video w-full shrink-0 object-cover"
-                />
+                {preview ? (
+                  <img
+                    src={preview}
+                    alt={item.titulo}
+                    className="aspect-video w-full shrink-0 object-cover"
+                  />
+                ) : (
+                  <div className="flex aspect-video w-full shrink-0 items-center justify-center bg-[var(--superficie-elevada)] text-sm text-[var(--texto-muted)]">
+                    Sem imagem
+                  </div>
+                )}
                 <div className="flex flex-1 flex-col p-3">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="line-clamp-2 min-h-11 flex-1 font-semibold leading-snug text-[var(--texto)]">
@@ -278,15 +325,20 @@ export function PaginaCms() {
                       {item.publicado ? 'Publicado' : 'Rascunho'}
                     </span>
                   </div>
-                  {item.grupoId && (
+                  {nomes && (
                     <p className="mt-1 text-xs text-[var(--texto-muted)]">
-                      Grupo: {nomesGrupo.get(item.grupoId) ?? '—'}
+                      Grupos: {nomes}
+                    </p>
+                  )}
+                  {item.urlsImagem.length > 1 && (
+                    <p className="mt-0.5 text-xs text-[var(--texto-muted)]">
+                      {item.urlsImagem.length} fotos
                     </p>
                   )}
                   <p className="mt-auto pt-2 text-xs text-[var(--texto-muted)]">Ordem: {item.ordem}</p>
                 </div>
               </button>
-            ))}
+            )})}
           </div>
         </>
       )}
@@ -308,7 +360,8 @@ export function PaginaCms() {
       <ModalPortfolio
         aberto={modalPortfolio.aberto}
         item={modalPortfolio.item}
-        onFechar={() => setModalPortfolio({ aberto: false, item: null })}
+        grupoIdsIniciais={modalPortfolio.grupoIds}
+        onFechar={() => setModalPortfolio({ aberto: false, item: null, grupoIds: [] })}
         onSalvo={invalidar}
       />
     </div>

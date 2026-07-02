@@ -36,7 +36,7 @@ export function Modal({ aberto, onFechar, titulo, children, largura = 'lg' }: Pr
       fechamentoProgramatico.current = false
       return
     }
-    onFechar()
+    // Não fecha por dismiss nativo (backdrop/Escape); só ações explícitas na UI.
   }
 
   if (!aberto) return null
@@ -44,14 +44,9 @@ export function Modal({ aberto, onFechar, titulo, children, largura = 'lg' }: Pr
   return (
     <dialog
       ref={ref}
+      closedby="none"
       onClose={fechar}
-      onCancel={(e) => {
-        e.preventDefault()
-        onFechar()
-      }}
-      onClick={(e) => {
-        if (e.target === ref.current) onFechar()
-      }}
+      onCancel={(e) => e.preventDefault()}
       className={`fixed top-1/2 left-1/2 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 ${larguras[largura]} rounded-xl border border-[var(--borda)] bg-[var(--superficie)] p-0 text-[var(--texto)] shadow-xl backdrop:bg-black/50`}
     >
       <div className="flex max-h-[90vh] flex-col">

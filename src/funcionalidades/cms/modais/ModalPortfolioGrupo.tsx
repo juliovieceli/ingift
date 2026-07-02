@@ -1,12 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { Botao } from '@/componentes/ui/Botao'
-import { CampoImagemCms } from '@/componentes/ui/CampoImagemCms'
+import { CampoImagensCms, removerImagensCms } from '@/componentes/ui/CampoImagensCms'
 import { Checkbox } from '@/componentes/ui/Checkbox'
 import { Input } from '@/componentes/ui/Input'
 import { Modal } from '@/componentes/ui/Modal'
-import { extrairCaminhoStorage, removerImagemCms } from '@/lib/storageImagem'
 import type { PortfolioGrupo } from '@/tipos/database'
 
 interface Props {
@@ -21,7 +20,7 @@ function valoresIniciais(grupo: PortfolioGrupo | null) {
     return {
       nome: grupo.nome,
       descricao: grupo.descricao ?? '',
-      urlImagem: grupo.urlImagem ?? '',
+      urlsImagem: grupo.urlsImagem,
       ordem: grupo.ordem,
       publicado: grupo.publicado,
     }
@@ -29,7 +28,7 @@ function valoresIniciais(grupo: PortfolioGrupo | null) {
   return {
     nome: '',
     descricao: '',
-    urlImagem: '',
+    urlsImagem: [] as string[],
     ordem: 99,
     publicado: false,
   }
@@ -47,10 +46,20 @@ function FormularioPortfolioGrupo({
   const init = valoresIniciais(grupo)
   const [nome, setNome] = useState(init.nome)
   const [descricao, setDescricao] = useState(init.descricao)
-  const [urlImagem, setUrlImagem] = useState(init.urlImagem)
+  const [urlsImagem, setUrlsImagem] = useState(init.urlsImagem)
   const [ordem, setOrdem] = useState(init.ordem)
   const [publicado, setPublicado] = useState(init.publicado)
   const [erro, setErro] = useState('')
+
+  useEffect(() => {
+    const v = valoresIniciais(grupo)
+    setNome(v.nome)
+    setDescricao(v.descricao)
+    setUrlsImagem(v.urlsImagem)
+    setOrdem(v.ordem)
+    setPublicado(v.publicado)
+    setErro('')
+  }, [grupo])
 
   const salvar = useMutation({
     mutationFn: async () => {
@@ -60,7 +69,7 @@ function FormularioPortfolioGrupo({
       const payload = {
         nome: nome.trim(),
         descricao: descricao.trim() || null,
-        urlImagem: urlImagem.trim() || null,
+        urlsImagem,
         ordem,
         publicado,
       }
@@ -80,10 +89,8 @@ function FormularioPortfolioGrupo({
   const excluir = useMutation({
     mutationFn: async () => {
       if (!supabase || !grupo) throw new Error('Grupo inválido')
-      if (!confirm(`Excluir o grupo "${grupo.nome}"? Os itens ficarão sem grupo.`)) return
-      if (urlImagem && extrairCaminhoStorage(urlImagem)) {
-        await removerImagemCms(urlImagem)
-      }
+      if (!confirm(`Excluir o grupo "${grupo.nome}"? Os itens permanecem, mas deixam de pertencer a este grupo.`)) return
+      await removerImagensCms(grupo.urlsImagem)
       const { error } = await supabase.from('PortfolioGrupo').delete().eq('id', grupo.id)
       if (error) throw error
     },
@@ -106,11 +113,11 @@ function FormularioPortfolioGrupo({
           placeholder="Texto exibido no card do grupo na home"
         />
       </label>
-      <CampoImagemCms
-        valor={urlImagem}
-        onChange={setUrlImagem}
+      <CampoImagensCms
+        valor={urlsImagem}
+        onChange={setUrlsImagem}
         preset="portfolio"
-        rotulo="Imagem do grupo"
+        rotulo="Imagens do grupo"
       />
       <p className="text-xs text-[var(--texto-muted)]">
         Opcional. Se vazio, usa a imagem do primeiro item publicado do grupo.

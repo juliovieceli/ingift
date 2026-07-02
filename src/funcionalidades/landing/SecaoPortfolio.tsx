@@ -2,7 +2,7 @@ import { Botao } from '@/componentes/ui/Botao'
 import { CardGrupoPortfolio } from '@/funcionalidades/landing/componentes/CardGrupoPortfolio'
 import { usePrefersMotion } from '@/hooks/usePrefersMotion'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
-import type { PortfolioGrupo, PortfolioItem } from '@/tipos/database'
+import type { PortfolioGrupo, PortfolioItemComGrupos } from '@/tipos/database'
 import { Link } from 'react-router-dom'
 
 const MAX_DESTAQUES = 4
@@ -11,7 +11,7 @@ interface Props {
   titulo: string
   subtitulo?: string
   grupos: PortfolioGrupo[]
-  itens: PortfolioItem[]
+  itens: PortfolioItemComGrupos[]
 }
 
 export function SecaoPortfolio({ titulo, subtitulo, grupos, itens }: Props) {

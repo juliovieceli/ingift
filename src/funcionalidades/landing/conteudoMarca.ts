@@ -6,7 +6,7 @@ export type ConteudoMarca = {
 
 export const MARCA_PADRAO: ConteudoMarca = {
   urlLogo: '/marca/sublogo.png',
-  nomeMarca: 'InGift',
+  nomeMarca: '',
   exibirLogoHero: false,
 }
 

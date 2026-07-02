@@ -29,9 +29,13 @@ export function LayoutLanding() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 border-b border-[var(--borda)] bg-[var(--superficie)]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={marca.urlLogo} alt={marca.nomeMarca} className="h-10 w-auto" />
+        <div className="mx-auto flex min-h-12 max-w-6xl items-center justify-between px-4 py-1.5">
+          <Link to="/" className="flex h-[calc(3rem-0.75rem)] items-center gap-2">
+            <img
+              src={marca.urlLogo}
+              alt={marca.nomeMarca}
+              className="block h-full max-h-full w-auto max-w-[min(100%,14rem)] object-contain object-left"
+            />
             <span className="hidden font-bold text-[var(--texto)] sm:inline">{marca.nomeMarca}</span>
           </Link>
           <nav className="flex items-center gap-4 text-sm">

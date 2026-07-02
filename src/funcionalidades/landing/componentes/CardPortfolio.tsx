@@ -1,17 +1,18 @@
 import { Botao } from '@/componentes/ui/Botao'
+import { CarrosselImagens, cliqueVeioDoCarrossel } from '@/componentes/ui/CarrosselImagens'
 import { ModalDetalhePortfolio } from '@/funcionalidades/landing/componentes/ModalDetalhePortfolio'
-import type { PortfolioItem } from '@/tipos/database'
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import type { PortfolioItemComGrupos } from '@/tipos/database'
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 
 interface Props {
-  item: PortfolioItem
-  nomeGrupo?: string | null
+  item: PortfolioItemComGrupos
+  nomesGrupo?: string[]
   idx?: number
   hoverCapaz?: boolean
   className?: string
 }
 
-export function CardPortfolio({ item, nomeGrupo = null, idx = 0, hoverCapaz = false, className = '' }: Props) {
+export function CardPortfolio({ item, nomesGrupo = [], idx = 0, hoverCapaz = false, className = '' }: Props) {
   const descRef = useRef<HTMLParagraphElement>(null)
   const [truncado, setTruncado] = useState(false)
   const [modalAberto, setModalAberto] = useState(false)
@@ -27,6 +28,11 @@ export function CardPortfolio({ item, nomeGrupo = null, idx = 0, hoverCapaz = fa
 
   const abrirDetalhe = () => setModalAberto(true)
 
+  const aoClicar = (e: MouseEvent<HTMLElement>) => {
+    if (cliqueVeioDoCarrossel(e.target)) return
+    abrirDetalhe()
+  }
+
   const aoTeclar = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
@@ -39,21 +45,20 @@ export function CardPortfolio({ item, nomeGrupo = null, idx = 0, hoverCapaz = fa
       <figure
         role="button"
         tabIndex={0}
-        onClick={abrirDetalhe}
+        onClick={aoClicar}
         onKeyDown={aoTeclar}
         className={`group flex w-full cursor-pointer flex-col overflow-hidden rounded-xl border border-[var(--borda)] transition hover:border-secondary-500/50 ${className}`}
         style={{ transitionDelay: `${idx * 80}ms` }}
       >
         <div className="relative aspect-square overflow-hidden">
-          <img
-            src={item.urlImagem}
+          <CarrosselImagens
+            imagens={item.urlsImagem}
             alt={item.titulo}
-            loading="lazy"
-            decoding="async"
-            className={`h-full w-full object-cover transition duration-500 ${hoverCapaz ? 'group-hover:scale-105' : ''}`}
+            hoverCapaz={hoverCapaz}
+            autoPlay={item.urlsImagem.length > 1}
           />
           {hoverCapaz && (
-            <div className="absolute inset-0 bg-gradient-to-t from-primary-950/80 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-primary-950/80 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
           )}
         </div>
         <figcaption className="flex flex-1 flex-col p-3">
@@ -85,8 +90,8 @@ export function CardPortfolio({ item, nomeGrupo = null, idx = 0, hoverCapaz = fa
         aberto={modalAberto}
         titulo={item.titulo}
         descricao={item.descricao}
-        urlImagem={item.urlImagem}
-        grupo={nomeGrupo}
+        urlsImagem={item.urlsImagem}
+        grupos={nomesGrupo}
         urlLoja={item.urlLoja}
         onFechar={() => setModalAberto(false)}
       />

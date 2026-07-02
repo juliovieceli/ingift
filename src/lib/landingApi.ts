@@ -1,11 +1,11 @@
-import type { PortfolioGrupo, PortfolioItem, SecaoLanding } from '@/tipos/database'
+import type { PortfolioGrupo, PortfolioItemComGrupos } from '@/tipos/database'
 import { supabase } from '@/lib/supabase'
 
-export type PortfolioGrupoLanding = Pick<PortfolioGrupo, 'id' | 'nome' | 'descricao' | 'urlImagem' | 'ordem'>
-export type PortfolioItemLanding = Pick<PortfolioItem, 'id' | 'titulo' | 'descricao' | 'urlImagem' | 'urlLoja' | 'grupoId' | 'ordem'>
+export type PortfolioGrupoLanding = Pick<PortfolioGrupo, 'id' | 'nome' | 'descricao' | 'urlsImagem' | 'ordem'>
+export type PortfolioItemLanding = Pick<PortfolioItemComGrupos, 'id' | 'titulo' | 'descricao' | 'urlsImagem' | 'urlLoja' | 'grupoIds' | 'ordem'>
 
 export interface DadosLanding {
-  secoes: Pick<SecaoLanding, 'slug' | 'titulo' | 'conteudo' | 'ordem'>[]
+  secoes: Pick<import('@/tipos/database').SecaoLanding, 'slug' | 'titulo' | 'conteudo' | 'ordem'>[]
   portfolioGrupos: PortfolioGrupoLanding[]
   portfolio: PortfolioItemLanding[]
 }
@@ -44,8 +44,8 @@ async function buscarViaSupabase(): Promise<DadosLanding | null> {
 
   const [secoesRes, gruposRes, portfolioRes] = await Promise.all([
     supabase.from('SecaoLandingPublica').select('slug, titulo, conteudo, ordem').order('ordem'),
-    supabase.from('PortfolioGrupoPublico').select('id, nome, descricao, urlImagem, ordem').order('ordem'),
-    supabase.from('PortfolioItemPublico').select('id, titulo, descricao, urlImagem, urlLoja, grupoId, ordem').order('ordem'),
+    supabase.from('PortfolioGrupoPublico').select('id, nome, descricao, urlsImagem, ordem').order('ordem'),
+    supabase.from('PortfolioItemPublico').select('id, titulo, descricao, urlsImagem, urlLoja, grupoIds, ordem').order('ordem'),
   ])
 
   if (secoesRes.error || gruposRes.error || portfolioRes.error) return null
