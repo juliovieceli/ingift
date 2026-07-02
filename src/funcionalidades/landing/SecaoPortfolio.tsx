@@ -29,15 +29,16 @@ export function SecaoPortfolio({ titulo, subtitulo, grupos, itens }: Props) {
           <p className="mx-auto mt-3 max-w-xl text-center text-[var(--texto-secundario)]">{subtitulo}</p>
         )}
         {destaques.length > 0 ? (
-          <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-10 flex flex-wrap justify-center gap-6">
             {destaques.map((grupo, idx) => (
-              <CardGrupoPortfolio
-                key={grupo.id}
-                grupo={grupo}
-                itens={itens}
-                idx={idx}
-                hoverCapaz={hoverCapaz}
-              />
+              <div key={grupo.id} className="w-full max-w-xs sm:max-w-[calc(50%-0.75rem)] lg:w-64">
+                <CardGrupoPortfolio
+                  grupo={grupo}
+                  itens={itens}
+                  idx={idx}
+                  hoverCapaz={hoverCapaz}
+                />
+              </div>
             ))}
           </div>
         ) : (
