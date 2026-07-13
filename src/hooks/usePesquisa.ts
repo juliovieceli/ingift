@@ -20,7 +20,11 @@ export function usePesquisa<T>(
   const filtrados = useMemo(() => {
     const q = termoDebounced.trim().toLowerCase()
     if (!q) return dados
-    return dados.filter((item) => extrairTexto(item).toLowerCase().includes(q))
+    const tokens = q.split(/\s+/).filter(Boolean)
+    return dados.filter((item) => {
+      const hay = extrairTexto(item).toLowerCase()
+      return tokens.every((t) => hay.includes(t))
+    })
   }, [dados, termoDebounced, extrairTexto])
 
   return { termo, setTermo, filtrados }

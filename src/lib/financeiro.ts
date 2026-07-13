@@ -42,8 +42,8 @@ export async function faturarOrcamento(
   params: { orcamentoId: string; planoContaId: string; vencimento: string; descricao?: string },
 ): Promise<string> {
   const { data, error } = await supabase.rpc('faturarOrcamento', {
-    p_orcamentoId:  params.orcamentoId,
-    p_planoContaId: params.planoContaId,
+    p_orcamentoid:  params.orcamentoId,
+    p_planocontaid: params.planoContaId,
     p_vencimento:   params.vencimento,
     p_descricao:    params.descricao ?? null,
   })

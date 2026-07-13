@@ -19,7 +19,7 @@ export async function orcamentoTemMovimentacaoEstoque(
   orcamentoId: string,
 ): Promise<boolean> {
   const { data, error } = await supabase.rpc('orcamentoTemMovimentacaoEstoque', {
-    p_orcamentoId: orcamentoId,
+    p_orcamentoid: orcamentoId,
   })
   if (error) {
     const { data: movs } = await supabase
@@ -44,7 +44,32 @@ export async function reverterEstoqueOrcamento(
   supabase: SupabaseClient,
   orcamentoId: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc('reverterEstoqueOrcamento', { p_orcamentoId: orcamentoId })
+  const { error } = await supabase.rpc('reverterEstoqueOrcamento', { p_orcamentoid: orcamentoId })
+  if (error) throw new Error(error.message)
+}
+
+const CODIGOS_MOVIMENTACAO_MANUAL = [
+  'entrada_compra',
+  'entrada_manual',
+  'perda',
+  'ajuste_manual',
+] as const
+
+export function ehMovimentacaoManual(codigo: string | null | undefined): boolean {
+  return CODIGOS_MOVIMENTACAO_MANUAL.includes(
+    codigo as (typeof CODIGOS_MOVIMENTACAO_MANUAL)[number],
+  )
+}
+
+export async function excluirMovimentacaoEstoque(
+  supabase: SupabaseClient,
+  movimentacaoId: string,
+  motivo?: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('excluirMovimentacaoEstoque', {
+    p_movimentacaoid: movimentacaoId,
+    p_motivo: motivo ?? null,
+  })
   if (error) throw new Error(error.message)
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Bookmark, ChevronDown, ChevronRight, History, Lock, Pencil, Phone, Receipt, Trash2, User } from 'lucide-react'
@@ -19,17 +19,26 @@ import {
 } from '@/lib/financeiro'
 import { recalcularTotaisOrcamento } from '@/lib/orcamento'
 import { Botao } from '@/componentes/ui/Botao'
+import { CampoPesquisa } from '@/componentes/ui/CampoPesquisa'
+import { CampoSelect } from '@/componentes/ui/CampoSelect'
 import { Card } from '@/componentes/ui/Card'
 import { Input } from '@/componentes/ui/Input'
 import { Modal } from '@/componentes/ui/Modal'
 import { ModalCalculadora } from '@/funcionalidades/admin/modais/ModalCalculadora'
 import { ModalFaturarOrcamento } from '@/funcionalidades/admin/modais/ModalFaturarOrcamento'
 import { ModalSalvarModelo } from '@/funcionalidades/admin/modais/ModalSalvarModelo'
+import { usePesquisa } from '@/hooks/usePesquisa'
 import { modeloDeItemOrcamento, itemTemModeloCorrespondente, listarModelosPeca, salvarModeloDePeca } from '@/lib/itemOrcamentoModelo'
 import type { OrcamentoItemComComposicao } from '@/lib/orcamento'
 import type { OrcamentoItem, OrcamentoStatus } from '@/tipos/database'
 
 type ItemComComposicao = OrcamentoItem & OrcamentoItemComComposicao
+
+type OrdenacaoItens = 'ordem' | 'nome_asc' | 'nome_desc' | 'preco_asc' | 'preco_desc'
+
+function precoItem(item: ItemComComposicao): number {
+  return Number(item.precoFinal ?? item.precoTotal) || 0
+}
 
 export function PaginaDetalheOrcamento() {
   const { id } = useParams<{ id: string }>()
@@ -37,6 +46,7 @@ export function PaginaDetalheOrcamento() {
   const qc = useQueryClient()
   const [novoStatusId, setNovoStatusId] = useState('')
   const [erro, setErro] = useState('')
+  const [ordenacaoItens, setOrdenacaoItens] = useState<OrdenacaoItens>('ordem')
   const [modalItem, setModalItem] = useState<{
     aberto: boolean
     tipo: 'peca' | 'avulso'
@@ -368,6 +378,47 @@ export function PaginaDetalheOrcamento() {
     onError: (e) => setErro(e instanceof Error ? e.message : 'Erro ao excluir orçamento'),
   })
 
+  const listaItens = itens.data ?? []
+
+  const extrairTextoItem = useCallback((item: ItemComComposicao) => {
+    const isAvulso = (item.tipoItem ?? 'peca') === 'avulso'
+    const composicao = item.OrcamentoItemComposicao ?? []
+    const partesComposicao = composicao.flatMap((c) => [
+      c.descricao ?? '',
+      c.tipo ?? '',
+      c.cor ?? '',
+      c.categoria ?? '',
+    ])
+    return [
+      item.nomePeca,
+      item.observacoes ?? '',
+      isAvulso ? 'Material' : 'Peça',
+      ...partesComposicao,
+    ].join(' ')
+  }, [])
+
+  const { termo, setTermo, filtrados } = usePesquisa(listaItens, extrairTextoItem, 200)
+
+  const itensExibidos = useMemo(() => {
+    const copia = [...filtrados]
+    copia.sort((a, b) => {
+      switch (ordenacaoItens) {
+        case 'nome_asc':
+          return a.nomePeca.localeCompare(b.nomePeca, 'pt-BR', { numeric: true })
+        case 'nome_desc':
+          return b.nomePeca.localeCompare(a.nomePeca, 'pt-BR', { numeric: true })
+        case 'preco_asc':
+          return precoItem(a) - precoItem(b)
+        case 'preco_desc':
+          return precoItem(b) - precoItem(a)
+        case 'ordem':
+        default:
+          return (a.ordem ?? 0) - (b.ordem ?? 0)
+      }
+    })
+    return copia
+  }, [filtrados, ordenacaoItens])
+
   const o = orcamento.data
   if (orcamento.isLoading) return <p className="text-[var(--texto-muted)]">Carregando...</p>
   if (!o) return <p className="text-erro">Orçamento não encontrado.</p>
@@ -375,13 +426,13 @@ export function PaginaDetalheOrcamento() {
   const travado = o.travado
   const faturado = o.faturado ?? false
   const bloqueado = travado || faturado
-  const listaItens = itens.data ?? []
   const totalItens = listaItens.reduce(
     (s, item) => s + (Number(item.precoFinal ?? item.precoTotal) || 0),
     0,
   )
   const totalOrcamento = Number(o.precoTotal)
   const valorTotal = Number.isFinite(totalOrcamento) ? totalOrcamento : totalItens
+  const filtroAtivo = termo.trim().length > 0
   const statusCor = o.OrcamentoStatus?.cor
   const statusNovoSelecionado = statusLista.data?.find((s) => s.id === (novoStatusId || o.statusOrcamentoId))
   const statusAtualObj = statusLista.data?.find((s) => s.id === o.statusOrcamentoId)
@@ -564,7 +615,9 @@ export function PaginaDetalheOrcamento() {
             </h3>
             {listaItens.length > 0 && (
               <p className="mt-0.5 text-xs text-[var(--texto-muted)]">
-                {listaItens.length} {listaItens.length === 1 ? 'item' : 'itens'}
+                {filtroAtivo
+                  ? `${itensExibidos.length} de ${listaItens.length} ${listaItens.length === 1 ? 'item' : 'itens'}`
+                  : `${listaItens.length} ${listaItens.length === 1 ? 'item' : 'itens'}`}
               </p>
             )}
           </div>
@@ -582,12 +635,40 @@ export function PaginaDetalheOrcamento() {
           )}
         </div>
 
+        {listaItens.length > 0 && (
+          <div className="flex flex-col gap-3 border-b border-[var(--borda)] px-5 py-3 sm:flex-row sm:items-end">
+            <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
+              <span className="text-[var(--texto-secundario)]">Filtrar itens</span>
+              <CampoPesquisa
+                valor={termo}
+                onChange={setTermo}
+                placeholder="Filtrar itens..."
+                className="w-full max-w-none"
+              />
+            </label>
+            <CampoSelect
+              rotulo="Ordenar"
+              value={ordenacaoItens}
+              onChange={(e) => setOrdenacaoItens(e.target.value as OrdenacaoItens)}
+              className="sm:min-w-[180px]"
+            >
+              <option value="ordem">Ordem original</option>
+              <option value="nome_asc">Nome A–Z</option>
+              <option value="nome_desc">Nome Z–A</option>
+              <option value="preco_asc">Preço menor → maior</option>
+              <option value="preco_desc">Preço maior → menor</option>
+            </CampoSelect>
+          </div>
+        )}
+
         <div className="px-2 pb-2 sm:px-0">
           {listaItens.length === 0 ? (
             <p className="px-5 py-8 text-center text-sm text-[var(--texto-muted)]">Nenhum item neste orçamento.</p>
+          ) : itensExibidos.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-[var(--texto-muted)]">Nenhum item encontrado.</p>
           ) : (
             <div className="divide-y divide-[var(--borda)]">
-              {listaItens.map((item) => {
+              {itensExibidos.map((item) => {
                 const isAvulso = (item.tipoItem ?? 'peca') === 'avulso'
                 const composicao = [...(item.OrcamentoItemComposicao ?? [])].sort((a, b) => a.ordem - b.ordem)
                 const subItens = isAvulso
