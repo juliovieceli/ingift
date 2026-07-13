@@ -1,8 +1,7 @@
-import { Plus, Trash2 } from 'lucide-react'
-import { selecionarTextoAoFocar } from '@/lib/selecionarAoFocar'
 import { Botao } from '@/componentes/ui/Botao'
 import { CampoSelect } from '@/componentes/ui/CampoSelect'
 import { Input } from '@/componentes/ui/Input'
+import type { ErrosPecaOrcamento } from '@/funcionalidades/admin/pecaOrcamentoHelpers'
 import {
   calcularItemPeca,
   configSnapshotDeConfig,
@@ -14,33 +13,11 @@ import {
   type ResultadoItemCompleto,
 } from '@/lib/calculadora'
 import { custoMedioDoMaterial, precoFilamentoPorKg } from '@/lib/estoque'
+import { calcularTaxasShopee } from '@/lib/marketplace/shopee'
+import { selecionarTextoAoFocar } from '@/lib/selecionarAoFocar'
 import type { Material } from '@/tipos/database'
-
-export type ErrosPecaOrcamento = Record<string, string>
-
-export function validarPecaOrcamento(peca: PecaCalculo): ErrosPecaOrcamento {
-  const erros: ErrosPecaOrcamento = {}
-
-  if (!peca.nomePeca.trim()) {
-    erros.nomePeca = 'Informe o nome da peça'
-  }
-  if (!peca.quantidade || peca.quantidade < 1) {
-    erros.quantidade = 'Quantidade mínima é 1'
-  }
-  if (peca.filamentos.length === 0) {
-    erros.filamentos = 'Adicione pelo menos um filamento'
-  }
-  peca.filamentos.forEach((fil, idx) => {
-    if (!fil.materialId) {
-      erros[`filamento.${idx}.materialId`] = 'Selecione o material de estoque'
-    }
-    if (!fil.pesoG || fil.pesoG <= 0) {
-      erros[`filamento.${idx}.pesoG`] = 'Informe o peso em gramas'
-    }
-  })
-
-  return erros
-}
+import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
 
 interface Props {
   config: ConfigOperacional
@@ -65,9 +42,19 @@ export function FormularioPecaOrcamento({
   erros = {},
   onLimparErro,
 }: Props) {
+  const [maisPrecosAberto, setMaisPrecosAberto] = useState(false)
   const filamentosMat = materiais.filter((m) => m.categoria === 'filamento')
   const insumosMat = materiais.filter((m) => m.categoria !== 'filamento')
   const margem = params ?? paramsMargemDeConfig(config)
+
+  const sugestaoShopee = useMemo(() => {
+    if (!resultado || resultado.precoAntesTaxa < 0) return null
+    try {
+      return calcularTaxasShopee(resultado.precoAntesTaxa)
+    } catch {
+      return null
+    }
+  }, [resultado])
 
   return (
     <div className="space-y-4">
@@ -241,23 +228,77 @@ export function FormularioPecaOrcamento({
       )}
 
       {resultado && (
-        <div className="grid grid-cols-2 gap-3 rounded-xl border border-secondary-500/30 bg-secondary-500/5 p-4 md:grid-cols-4">
-          <div><p className="text-xs text-[var(--texto-muted)]">Custo produção</p><p className="font-semibold">{formatarMoeda(resultado.custoProducaoTotal)}</p></div>
-          <div><p className="text-xs text-[var(--texto-muted)]">Preço venda</p><p className="font-semibold">{formatarMoeda(resultado.precoVenda)}</p></div>
-          <div><p className="text-xs text-[var(--texto-muted)]">Preço final</p><p className="font-semibold text-secondary-600">{formatarMoeda(resultado.precoFinal)}</p></div>
-          <div><p className="text-xs text-[var(--texto-muted)]">Lucro</p><p className="font-semibold text-sucesso">{formatarMoeda(resultado.lucroEfetivo)}</p></div>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 rounded-xl border border-secondary-500/30 bg-secondary-500/5 p-4 md:grid-cols-4">
+            <div>
+              <p className="text-xs text-[var(--texto-muted)]">Custo produção</p>
+              <p className="font-semibold">{formatarMoeda(resultado.custoProducaoTotal)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-[var(--texto-muted)]">Venda direta</p>
+              <p className="font-semibold">{formatarMoeda(resultado.precoVenda)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-[var(--texto-muted)]">Preço final</p>
+              <p className="font-semibold text-secondary-600">{formatarMoeda(resultado.precoFinal)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-[var(--texto-muted)]">Lucro</p>
+              <p className="font-semibold text-sucesso">{formatarMoeda(resultado.lucroEfetivo)}</p>
+            </div>
+          </div>
+
+          {sugestaoShopee && (
+            <div className="rounded-xl border border-[var(--borda)] bg-[var(--superficie)] p-4">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-2 text-left"
+                onClick={() => setMaisPrecosAberto((v) => !v)}
+                aria-expanded={maisPrecosAberto}
+              >
+                <span className="text-xs font-medium uppercase tracking-wider text-[var(--texto-muted)]">
+                  Mais preços sugeridos
+                </span>
+                {maisPrecosAberto ? (
+                  <ChevronDown className="h-4 w-4 shrink-0 text-[var(--texto-muted)]" />
+                ) : (
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--texto-muted)]" />
+                )}
+              </button>
+
+              {maisPrecosAberto && (
+                <div className="mt-3 space-y-3 border-t border-[var(--borda)] pt-3">
+                  <p className="text-xs font-semibold text-[var(--texto-muted)]">Shopee (CNPJ)</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-[var(--borda)] p-3">
+                      <p className="text-xs text-[var(--texto-muted)]">Cartão / boleto</p>
+                      <p className="text-lg font-semibold text-secondary-600">
+                        {formatarMoeda(sugestaoShopee.precoAnuncio)}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--texto-muted)]">
+                        Comissão {formatarMoeda(sugestaoShopee.cartaoBoleto.comissao)} · Líquido{' '}
+                        {formatarMoeda(sugestaoShopee.cartaoBoleto.liquido)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-[var(--borda)] p-3">
+                      <p className="text-xs text-[var(--texto-muted)]">Pix</p>
+                      <p className="text-lg font-semibold text-secondary-600">
+                        {formatarMoeda(sugestaoShopee.precoAnuncio)}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--texto-muted)]">
+                        Subsídio {formatarMoeda(sugestaoShopee.pix.subsidio)} · NF{' '}
+                        {formatarMoeda(sugestaoShopee.pix.valorNota)} · Comissão{' '}
+                        {formatarMoeda(sugestaoShopee.pix.comissao)} · Líquido{' '}
+                        {formatarMoeda(sugestaoShopee.pix.liquido)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
   )
 }
-
-export const pecaVazia = (): PecaCalculo => ({
-  nomePeca: '',
-  tempoHoras: 0,
-  tempoMinutos: 0,
-  quantidade: 1,
-  observacoes: '',
-  filamentos: [],
-  insumos: [],
-})

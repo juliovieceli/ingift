@@ -211,6 +211,7 @@ export interface Database {
       }>
       EstoqueMovimentacao: Tabela<{
         id: string
+        numeroSequencial: number
         materialId: string | null
         tipoMovimentacaoId: string
         quantidade: number | null

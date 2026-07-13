@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Botao } from '@/componentes/ui/Botao'
 import { Modal } from '@/componentes/ui/Modal'
 import { FormularioItemAvulso } from '@/funcionalidades/admin/FormularioItemAvulso'
-import { FormularioPecaOrcamento, pecaVazia, validarPecaOrcamento, type ErrosPecaOrcamento } from '@/funcionalidades/admin/FormularioPecaOrcamento'
+import { FormularioPecaOrcamento } from '@/funcionalidades/admin/FormularioPecaOrcamento'
+import { pecaVazia, validarPecaOrcamento, type ErrosPecaOrcamento } from '@/funcionalidades/admin/pecaOrcamentoHelpers'
 import { ModalDivergenciaPrecos } from '@/funcionalidades/admin/modais/ModalDivergenciaPrecos'
 import { ModalSalvarModelo } from '@/funcionalidades/admin/modais/ModalSalvarModelo'
 import { PainelConfigCalculadora } from '@/funcionalidades/admin/PainelConfigCalculadora'
@@ -395,6 +396,7 @@ export function ModalCalculadora({
       <Modal aberto={aberto} onFechar={onFechar} titulo={titulo} largura="2xl">
         <div className="space-y-6">
           <PainelConfigCalculadora
+            variante="cotacao"
             onConfigAlterada={() => {
               if (!itemEdicao) setParams(paramsMargemDeConfig(config))
             }}

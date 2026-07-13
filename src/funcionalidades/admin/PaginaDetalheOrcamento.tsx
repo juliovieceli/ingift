@@ -446,12 +446,16 @@ export function PaginaDetalheOrcamento() {
 
   return (
     <div className="space-y-5">
-      <Link
-        to="/admin/orcamentos"
+      <button
+        type="button"
+        onClick={() => {
+          if (window.history.length > 1) navigate(-1)
+          else navigate('/admin/orcamentos')
+        }}
         className="inline-flex items-center gap-1.5 text-sm text-[var(--texto-muted)] transition hover:text-[var(--texto)]"
       >
-        <ArrowLeft className="h-4 w-4" /> Voltar aos orçamentos
-      </Link>
+        <ArrowLeft className="h-4 w-4" /> Voltar
+      </button>
 
       <Card className="p-0">
         <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6">

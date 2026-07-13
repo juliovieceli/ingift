@@ -1,30 +1,31 @@
-import { useCallback, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Wallet, ArrowDownCircle, ArrowUpCircle, FileText, TrendingUp, Building2 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { Botao } from '@/componentes/ui/Botao'
+import { CampoPesquisa } from '@/componentes/ui/CampoPesquisa'
+import { Card } from '@/componentes/ui/Card'
+import { Modal } from '@/componentes/ui/Modal'
+import { TabelaDados } from '@/componentes/ui/TabelaDados'
+import { ModalBaixaTitulo } from '@/funcionalidades/admin/modais/ModalBaixaTitulo'
+import { ModalContaCaixa } from '@/funcionalidades/admin/modais/ModalContaCaixa'
+import { ModalPlanoConta } from '@/funcionalidades/admin/modais/ModalPlanoConta'
+import { ModalTituloFinanceiro } from '@/funcionalidades/admin/modais/ModalTituloFinanceiro'
+import { useBreakpoint } from '@/hooks/useBreakpoint'
+import { useOrdenacaoPaginacao } from '@/hooks/useOrdenacaoPaginacao'
+import { usePesquisa } from '@/hooks/usePesquisa'
 import { formatarMoeda } from '@/lib/calculadora'
 import {
+  buscarBaixasDeTitulo,
   corStatusTitulo,
   estornarBaixaTitulo,
   excluirTituloFinanceiro,
   rotuloStatusTitulo,
   saldoPendente,
-  buscarBaixasDeTitulo,
   type LinhaFluxo,
 } from '@/lib/financeiro'
-import { useOrdenacaoPaginacao } from '@/hooks/useOrdenacaoPaginacao'
-import { usePesquisa } from '@/hooks/usePesquisa'
-import { useBreakpoint } from '@/hooks/useBreakpoint'
-import { Botao } from '@/componentes/ui/Botao'
-import { CampoPesquisa } from '@/componentes/ui/CampoPesquisa'
-import { Card } from '@/componentes/ui/Card'
-import { TabelaDados } from '@/componentes/ui/TabelaDados'
-import { Modal } from '@/componentes/ui/Modal'
-import { ModalPlanoConta } from '@/funcionalidades/admin/modais/ModalPlanoConta'
-import { ModalContaCaixa } from '@/funcionalidades/admin/modais/ModalContaCaixa'
-import { ModalTituloFinanceiro } from '@/funcionalidades/admin/modais/ModalTituloFinanceiro'
-import { ModalBaixaTitulo } from '@/funcionalidades/admin/modais/ModalBaixaTitulo'
+import { supabase } from '@/lib/supabase'
 import type { FinanceiroBaixa, FinanceiroContaCaixa, FinanceiroPlanoConta, FinanceiroTitulo } from '@/tipos/database'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowDownCircle, ArrowUpCircle, Building2, ExternalLink, FileText, Plus, TrendingUp, Wallet } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 type Aba = 'titulos' | 'fluxo' | 'plano-contas' | 'contas-caixa'
 
@@ -32,12 +33,14 @@ type TituloComRelacoes = FinanceiroTitulo & {
   FinanceiroPlanoConta?: { nome: string } | null
   Cliente?: { nome: string } | null
   Orcamento?: { numeroSequencial: number } | null
+  EstoqueMovimentacao?: { numeroSequencial: number } | null
 }
 
 type FiltroStatus = 'todos' | FinanceiroTitulo['status']
 type FiltroTipo = 'todos' | 'receita' | 'despesa'
 
 export function PaginaFinanceiro() {
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const { ehMobile } = useBreakpoint()
   const [aba, setAba] = useState<Aba>('titulos')
@@ -85,7 +88,9 @@ export function PaginaFinanceiro() {
       if (!supabase) return []
       let q = supabase
         .from('FinanceiroTitulo')
-        .select('*, FinanceiroPlanoConta(nome), Cliente(nome), Orcamento(numeroSequencial)')
+        .select(
+          '*, FinanceiroPlanoConta(nome), Cliente(nome), Orcamento(numeroSequencial), EstoqueMovimentacao(numeroSequencial)',
+        )
         .order('dataVencimento', { ascending: true })
       if (filtroTipo !== 'todos') q = q.eq('tipo', filtroTipo)
       if (filtroStatus !== 'todos') q = q.eq('status', filtroStatus)
@@ -175,16 +180,19 @@ export function PaginaFinanceiro() {
 
   function origemTitulo(t: TituloComRelacoes): string {
     if (t.Orcamento) return `Orçamento #${t.Orcamento.numeroSequencial}`
-    if (t.movimentacaoEstoqueId) return 'Compra estoque'
+    if (t.EstoqueMovimentacao) return `Movimentação #${t.EstoqueMovimentacao.numeroSequencial}`
+    if (t.movimentacaoEstoqueId) return 'Movimentação de estoque'
     return 'Manual'
   }
 
   const extrairTextoTitulo = useCallback((t: TituloComRelacoes) => {
     return [
       t.descricao,
+      t.observacoes ?? '',
       t.FinanceiroPlanoConta?.nome ?? '',
       t.Cliente?.nome ?? '',
       t.Orcamento ? `#${t.Orcamento.numeroSequencial}` : '',
+      t.EstoqueMovimentacao ? `#${t.EstoqueMovimentacao.numeroSequencial}` : '',
       t.tipo,
       rotuloStatusTitulo(t.status),
     ].join(' ')
@@ -216,6 +224,35 @@ export function PaginaFinanceiro() {
           <FileText className="h-4 w-4" />
           {mobile && <span>Baixas</span>}
         </button>
+        {t.orcamentoId && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(`/admin/orcamentos/${t.orcamentoId}`)
+            }}
+            className={`${btnClass} text-[var(--primaria)] hover:bg-[var(--primaria)]/10 ${!mobile ? 'hover:underline' : ''}`}
+            title="Ver orçamento"
+          >
+            <ExternalLink className="h-4 w-4" />
+          {/*   {mobile ? <span>Orçamento</span> : <span>Ver orçamento</span>} */}
+          </button>
+        )}
+        {t.movimentacaoEstoqueId && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(`/admin/movimentacoes?id=${t.movimentacaoEstoqueId}`)
+            }}
+            className={`${btnClass} text-[var(--primaria)] hover:bg-[var(--primaria)]/10 ${!mobile ? 'hover:underline' : ''}`}
+            title="Ver movimentação"
+          >
+            <ExternalLink className="h-4 w-4" />
+           {/*  {mobile ? <span>Movimentação</span> : <span>Ver movimentação</span>} */}
+          </button>
+        )}
+ 
         {t.status !== 'quitado' && (
           <button
             type="button"
@@ -256,6 +293,9 @@ export function PaginaFinanceiro() {
           <div className="min-w-0 flex-1">
             <p className="font-medium text-[var(--texto)]">{t.descricao}</p>
             <p className="text-xs text-[var(--texto-muted)]">{origemTitulo(t)}</p>
+            {t.observacoes && (
+              <p className="mt-1 text-xs text-[var(--texto-secundario)]">{t.observacoes}</p>
+            )}
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -452,6 +492,9 @@ export function PaginaFinanceiro() {
                   <div>
                     <p className="font-medium text-[var(--texto)]">{t.descricao}</p>
                     <p className="text-xs text-[var(--texto-muted)]">{origemTitulo(t)}</p>
+                    {t.observacoes && (
+                      <p className="mt-0.5 text-xs text-[var(--texto-secundario)]">{t.observacoes}</p>
+                    )}
                   </div>
                 ),
               },
