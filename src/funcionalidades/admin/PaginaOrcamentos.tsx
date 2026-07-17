@@ -6,6 +6,7 @@ import { formatarMoeda } from '@/lib/calculadora'
 import { criarOrcamentoVazio } from '@/lib/orcamento'
 import {
   type CampoDataOrcamentoFiltro,
+  dataIsoLocal,
   passaFiltroDataOrcamento,
   ROTULOS_CAMPO_DATA_ORCAMENTO,
 } from '@/lib/orcamentoFiltroData'
@@ -14,6 +15,7 @@ import { CampoPesquisa } from '@/componentes/ui/CampoPesquisa'
 import { Input } from '@/componentes/ui/Input'
 import { Modal } from '@/componentes/ui/Modal'
 import { TabelaDados } from '@/componentes/ui/TabelaDados'
+import { TextoTruncado } from '@/componentes/ui/TextoTruncado'
 import { useOrdenacaoPaginacao } from '@/hooks/useOrdenacaoPaginacao'
 import { usePesquisa } from '@/hooks/usePesquisa'
 import type { Orcamento } from '@/tipos/database'
@@ -24,10 +26,38 @@ type OrcamentoLista = Orcamento & {
   OrcamentoItem?: { nomePeca: string; ordem: number }[]
 }
 
+// Status que NÃO contam como "pendente" (peça encerrada / fora do fluxo ativo)
+const CODIGOS_ENCERRADOS = ['finalizado', 'entregue', 'cancelado']
+
+function datasPadrao() {
+  const hoje = new Date()
+  const inicio = new Date()
+  inicio.setDate(hoje.getDate() - 7)
+  return { inicio: dataIsoLocal(inicio), fim: dataIsoLocal(hoje) }
+}
+
 function nomesPecas(o: OrcamentoLista) {
   return [...(o.OrcamentoItem ?? [])]
     .sort((a, b) => a.ordem - b.ordem)
     .map((i) => i.nomePeca)
+    .join(', ')
+}
+
+// Agrupa itens iguais somando a quantidade: "2× Anel, Colar"
+function agruparPecas(o: OrcamentoLista) {
+  const itens = [...(o.OrcamentoItem ?? [])].sort((a, b) => a.ordem - b.ordem)
+  const contagem = new Map<string, number>()
+  const ordem: string[] = []
+  for (const it of itens) {
+    const nome = it.nomePeca?.trim() || '—'
+    if (!contagem.has(nome)) ordem.push(nome)
+    contagem.set(nome, (contagem.get(nome) ?? 0) + 1)
+  }
+  return ordem
+    .map((nome) => {
+      const q = contagem.get(nome) ?? 1
+      return q > 1 ? `${q}× ${nome}` : nome
+    })
     .join(', ')
 }
 
@@ -37,8 +67,9 @@ export function PaginaOrcamentos() {
   const [clienteId, setClienteId] = useState('')
   const [erro, setErro] = useState('')
   const [campoData, setCampoData] = useState<CampoDataOrcamentoFiltro>('lancamento')
-  const [dataInicio, setDataInicio] = useState('')
-  const [dataFim, setDataFim] = useState('')
+  const [dataInicio, setDataInicio] = useState(() => datasPadrao().inicio)
+  const [dataFim, setDataFim] = useState(() => datasPadrao().fim)
+  const [statusFiltro, setStatusFiltro] = useState('')
 
   const orcamentos = useQuery({
     queryKey: ['orcamentos'],
@@ -49,6 +80,19 @@ export function PaginaOrcamentos() {
         .select('*, Cliente(nome), OrcamentoStatus(nome, codigo), OrcamentoItem(nomePeca, ordem)')
         .order('criadoEm', { ascending: false })
       return (data ?? []) as OrcamentoLista[]
+    },
+  })
+
+  const statusDisponiveis = useQuery({
+    queryKey: ['orcamento-status'],
+    queryFn: async () => {
+      if (!supabase) return []
+      const { data } = await supabase
+        .from('OrcamentoStatus')
+        .select('codigo, nome, ordem')
+        .eq('ativo', true)
+        .order('ordem')
+      return (data ?? []) as { codigo: string; nome: string; ordem: number }[]
     },
   })
 
@@ -95,9 +139,21 @@ export function PaginaOrcamentos() {
     [filtrados, campoData, dataInicio, dataFim],
   )
 
-  const tabela = useOrdenacaoPaginacao(filtradosPorData, 'criadoEm', 'desc')
+  const filtradosPorStatus = useMemo(() => {
+    if (!statusFiltro) return filtradosPorData
+    if (statusFiltro === 'pendentes') {
+      return filtradosPorData.filter(
+        (o) => !o.consignado && !CODIGOS_ENCERRADOS.includes(o.OrcamentoStatus?.codigo ?? ''),
+      )
+    }
+    return filtradosPorData.filter((o) => o.OrcamentoStatus?.codigo === statusFiltro)
+  }, [filtradosPorData, statusFiltro])
 
-  const limparFiltroData = () => {
+  const tabela = useOrdenacaoPaginacao(filtradosPorStatus, 'criadoEm', 'desc')
+
+  const limparFiltros = () => {
+    setTermo('')
+    setStatusFiltro('')
     setDataInicio('')
     setDataFim('')
   }
@@ -170,6 +226,20 @@ export function PaginaOrcamentos() {
               className="w-full max-w-none"
             />
           </label>
+          <label className="flex min-w-[160px] flex-1 flex-col gap-1 text-sm lg:max-w-[200px]">
+            <span className="text-[var(--texto-secundario)]">Status</span>
+            <select
+              value={statusFiltro}
+              onChange={(e) => setStatusFiltro(e.target.value)}
+              className="rounded-lg border border-[var(--borda)] bg-[var(--superficie)] px-3 py-2 text-[var(--texto)]"
+            >
+              <option value="">Todos os status</option>
+              <option value="pendentes">Pendentes</option>
+              {statusDisponiveis.data?.map((s) => (
+                <option key={s.codigo} value={s.codigo}>{s.nome}</option>
+              ))}
+            </select>
+          </label>
           <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-sm lg:max-w-[220px]">
             <span className="text-[var(--texto-secundario)]">Filtrar por</span>
             <select
@@ -198,11 +268,11 @@ export function PaginaOrcamentos() {
             onChange={(e) => setDataFim(e.target.value)}
             className="sm:w-40"
           />
-          {(termo || dataInicio || dataFim) && (
+          {(termo || statusFiltro || dataInicio || dataFim) && (
             <Botao
               type="button"
               variante="fantasma"
-              onClick={() => { setTermo(''); limparFiltroData() }}
+              onClick={limparFiltros}
               className="sm:mb-0.5"
             >
               Limpar filtros
@@ -214,19 +284,23 @@ export function PaginaOrcamentos() {
       <div className="mt-6">
         <TabelaDados
           idTabela="orcamentos-lista"
-          colunasPadraoMobile={['numeroSequencial', 'cliente', 'precoTotal', 'status', 'acoes']}
+          colunasPadraoMobile={['numeroSequencial', 'cliente', 'pecas', 'precoTotal', 'status', 'criadoEmSort', 'acoes']}
           renderCard={renderCardOrcamento}
           colunas={[
             { id: 'numeroSequencial', rotulo: '#', ordenavel: true, obrigatoria: true, render: (o) => `#${o.numeroSequencial}` },
             { id: 'cliente', rotulo: 'Cliente', ordenavel: true, obrigatoria: true, render: (o) => o.Cliente?.nome ?? '—' },
             {
               id: 'pecas',
-              rotulo: 'Peças',
-              render: (o) => (
-                <span className="line-clamp-1 max-w-[220px] text-[var(--texto-secundario)]" title={nomesPecas(o)}>
-                  {nomesPecas(o) || '—'}
-                </span>
-              ),
+              rotulo: 'Itens lançados',
+              render: (o) => {
+                const texto = agruparPecas(o)
+                return (
+                  <TextoTruncado
+                    texto={texto || '—'}
+                    className="max-w-[260px] text-[var(--texto-secundario)]"
+                  />
+                )
+              },
             },
             {
               id: 'status',
@@ -257,7 +331,7 @@ export function PaginaOrcamentos() {
             },
             {
               id: 'criadoEmSort',
-              rotulo: 'Data',
+              rotulo: 'Data de lançamento',
               ordenavel: true,
               render: (o) => new Date(o.criadoEm).toLocaleDateString('pt-BR'),
             },

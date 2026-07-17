@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Bookmark, ChevronDown, ChevronRight, History, Lock, Pencil, Phone, Receipt, Trash2, User } from 'lucide-react'
+import { ArrowLeft, Bookmark, ChevronDown, ChevronRight, Copy, Handshake, History, Lock, Pencil, Phone, Receipt, Trash2, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatarMoeda } from '@/lib/calculadora'
 import {
@@ -11,12 +11,13 @@ import {
   reverterEstoqueOrcamento,
 } from '@/lib/estoque'
 import {
-  buscarTituloDoOrcamento,
+  buscarTitulosDoOrcamento,
   corStatusTitulo,
   estornarBaixaTitulo,
   excluirTituloFinanceiro,
   rotuloStatusTitulo,
 } from '@/lib/financeiro'
+import { consignarOrcamento, reverterConsignacaoOrcamento } from '@/lib/consignacao'
 import { recalcularTotaisOrcamento } from '@/lib/orcamento'
 import { Botao } from '@/componentes/ui/Botao'
 import { CampoPesquisa } from '@/componentes/ui/CampoPesquisa'
@@ -25,6 +26,7 @@ import { Card } from '@/componentes/ui/Card'
 import { Input } from '@/componentes/ui/Input'
 import { Modal } from '@/componentes/ui/Modal'
 import { ModalCalculadora } from '@/funcionalidades/admin/modais/ModalCalculadora'
+import { ModalDuplicarOrcamento } from '@/funcionalidades/admin/modais/ModalDuplicarOrcamento'
 import { ModalFaturarOrcamento } from '@/funcionalidades/admin/modais/ModalFaturarOrcamento'
 import { ModalSalvarModelo } from '@/funcionalidades/admin/modais/ModalSalvarModelo'
 import { usePesquisa } from '@/hooks/usePesquisa'
@@ -59,12 +61,15 @@ export function PaginaDetalheOrcamento() {
   const [novoClienteId, setNovoClienteId] = useState('')
   const [erroCliente, setErroCliente] = useState('')
   const [modalFaturar, setModalFaturar] = useState(false)
+  const [modalDuplicar, setModalDuplicar] = useState(false)
   const [modalLiberarFaturamento, setModalLiberarFaturamento] = useState(false)
   const [motivoLiberacao, setMotivoLiberacao] = useState('')
   const [erroLiberacao, setErroLiberacao] = useState('')
   const [perguntarFaturarAposStatus, setPerguntarFaturarAposStatus] = useState(false)
+  const [erroConsignar, setErroConsignar] = useState('')
   const [prazoEntrega, setPrazoEntrega] = useState('')
   const [erroPrazoEntrega, setErroPrazoEntrega] = useState('')
+  const [prazoSincronizadoDe, setPrazoSincronizadoDe] = useState<string | null>(null)
   const [itemSalvarModelo, setItemSalvarModelo] = useState<ItemComComposicao | null>(null)
   const [erroSalvarModelo, setErroSalvarModelo] = useState('')
   const [itensSalvosComoModelo, setItensSalvosComoModelo] = useState<Set<string>>(new Set())
@@ -173,14 +178,17 @@ export function PaginaDetalheOrcamento() {
     },
   })
 
-  const tituloFinanceiro = useQuery({
-    queryKey: ['titulo-financeiro-orcamento', id],
+  const titulosFinanceiros = useQuery({
+    queryKey: ['titulos-financeiro-orcamento', id],
     enabled: Boolean(id),
     queryFn: async () => {
-      if (!supabase || !id) return null
-      return buscarTituloDoOrcamento(supabase, id)
+      if (!supabase || !id) return []
+      return buscarTitulosDoOrcamento(supabase, id)
     },
   })
+
+  const tituloReceita = titulosFinanceiros.data?.find((t) => t.tipo === 'receita') ?? null
+  const titulosDespesa = (titulosFinanceiros.data ?? []).filter((t) => t.tipo === 'despesa')
 
   const movimentacoesEstoque = useQuery({
     queryKey: ['orcamento-mov-estoque', id],
@@ -194,28 +202,69 @@ export function PaginaDetalheOrcamento() {
   const liberarFaturamento = useMutation({
     mutationFn: async () => {
       if (!supabase || !id) throw new Error('Dados inválidos')
-      const titulo = tituloFinanceiro.data
-      if (!titulo) throw new Error('Título financeiro não encontrado')
+      const titulos = titulosFinanceiros.data ?? []
+      if (titulos.length === 0) throw new Error('Título financeiro não encontrado')
 
-      // estornar baixas pendentes
-      const { data: baixas } = await supabase
-        .from('FinanceiroBaixa')
-        .select('id')
-        .eq('tituloId', titulo.id)
-      for (const b of baixas ?? []) {
-        await estornarBaixaTitulo(supabase, b.id, motivoLiberacao || undefined)
+      for (const titulo of titulos) {
+        const { data: baixas } = await supabase
+          .from('FinanceiroBaixa')
+          .select('id')
+          .eq('tituloId', titulo.id)
+        for (const b of baixas ?? []) {
+          await estornarBaixaTitulo(supabase, b.id, motivoLiberacao || undefined)
+        }
+        await excluirTituloFinanceiro(supabase, titulo.id, motivoLiberacao || undefined)
       }
-      await excluirTituloFinanceiro(supabase, titulo.id, motivoLiberacao || undefined)
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['orcamento', id] })
-      qc.invalidateQueries({ queryKey: ['titulo-financeiro-orcamento', id] })
+      qc.invalidateQueries({ queryKey: ['titulos-financeiro-orcamento', id] })
       qc.invalidateQueries({ queryKey: ['financeiro-titulos'] })
+      qc.invalidateQueries({ queryKey: ['fluxo-caixa'] })
       setModalLiberarFaturamento(false)
       setMotivoLiberacao('')
       setErroLiberacao('')
     },
     onError: (e) => setErroLiberacao(e instanceof Error ? e.message : 'Erro ao liberar faturamento'),
+  })
+
+  const consignar = useMutation({
+    mutationFn: async () => {
+      if (!supabase || !id) throw new Error('Orçamento inválido')
+      if (!confirm('Consignar este orçamento? As peças vão para a consignação do cliente e o estoque será baixado.')) {
+        return null
+      }
+      return consignarOrcamento(supabase, { orcamentoId: id })
+    },
+    onSuccess: (consId) => {
+      setErroConsignar('')
+      qc.invalidateQueries({ queryKey: ['orcamento', id] })
+      qc.invalidateQueries({ queryKey: ['orcamentos'] })
+      qc.invalidateQueries({ queryKey: ['consignacoes'] })
+      qc.invalidateQueries({ queryKey: ['materiais'] })
+      qc.invalidateQueries({ queryKey: ['movimentacoes'] })
+      if (consId) navigate(`/admin/consignacoes/${consId}`)
+    },
+    onError: (e) => setErroConsignar(e instanceof Error ? e.message : 'Erro ao consignar'),
+  })
+
+  const reverterConsignacao = useMutation({
+    mutationFn: async () => {
+      if (!supabase || !id) throw new Error('Orçamento inválido')
+      if (!confirm('Reverter a consignação deste orçamento? As peças saem da consignação e o estoque é estornado.')) {
+        return
+      }
+      await reverterConsignacaoOrcamento(supabase, id)
+    },
+    onSuccess: () => {
+      setErroConsignar('')
+      qc.invalidateQueries({ queryKey: ['orcamento', id] })
+      qc.invalidateQueries({ queryKey: ['orcamentos'] })
+      qc.invalidateQueries({ queryKey: ['consignacoes'] })
+      qc.invalidateQueries({ queryKey: ['materiais'] })
+      qc.invalidateQueries({ queryKey: ['movimentacoes'] })
+    },
+    onError: (e) => setErroConsignar(e instanceof Error ? e.message : 'Erro ao reverter consignação'),
   })
 
   const alterarStatus = useMutation({
@@ -284,10 +333,14 @@ export function PaginaDetalheOrcamento() {
     onError: (e) => setErroCliente(e instanceof Error ? e.message : 'Erro ao alterar cliente'),
   })
 
-  useEffect(() => {
-    setPrazoEntrega(orcamento.data?.prazoEntrega ?? '')
+  const chavePrazoServidor = orcamento.data
+    ? `${orcamento.data.id}:${orcamento.data.prazoEntrega ?? ''}`
+    : null
+  if (chavePrazoServidor !== null && chavePrazoServidor !== prazoSincronizadoDe) {
+    setPrazoSincronizadoDe(chavePrazoServidor)
+    setPrazoEntrega(orcamento.data!.prazoEntrega ?? '')
     setErroPrazoEntrega('')
-  }, [orcamento.data?.id, orcamento.data?.prazoEntrega])
+  }
 
   const salvarPrazoEntrega = useMutation({
     mutationFn: async (valor: string) => {
@@ -425,7 +478,12 @@ export function PaginaDetalheOrcamento() {
 
   const travado = o.travado
   const faturado = o.faturado ?? false
-  const bloqueado = travado || faturado
+  const consignado = o.consignado ?? false
+  const bloqueado = travado || faturado || consignado
+  const podeConsignar =
+    !faturado &&
+    !consignado &&
+    ['em_producao', 'finalizado', 'entregue'].includes(o.OrcamentoStatus?.codigo ?? '')
   const totalItens = listaItens.reduce(
     (s, item) => s + (Number(item.precoFinal ?? item.precoTotal) || 0),
     0,
@@ -510,7 +568,7 @@ export function PaginaDetalheOrcamento() {
                 </div>
               </div>
             </div>
-            {travado && !faturado && (
+            {travado && !faturado && !consignado && (
               <p className="flex items-center gap-1.5 text-sm text-alerta">
                 <Lock className="h-4 w-4" /> Travado — itens não podem ser alterados
               </p>
@@ -518,6 +576,11 @@ export function PaginaDetalheOrcamento() {
             {faturado && (
               <p className="flex items-center gap-1.5 text-sm text-sucesso">
                 <Receipt className="h-4 w-4" /> Faturado — itens e valores bloqueados
+              </p>
+            )}
+            {consignado && (
+              <p className="flex items-center gap-1.5 text-sm text-secondary-600">
+                <Handshake className="h-4 w-4" /> Consignado — itens bloqueados; controle na consignação
               </p>
             )}
           </div>
@@ -557,21 +620,42 @@ export function PaginaDetalheOrcamento() {
             )}
           </button>
 
+          {!consignado && (
+            <button
+              type="button"
+              onClick={() => setModalStatus(true)}
+              className="inline-flex items-center gap-1.5 text-sm text-[var(--texto-muted)] transition hover:text-[var(--texto)]"
+            >
+              Alterar status
+            </button>
+          )}
+
           <button
             type="button"
-            onClick={() => setModalStatus(true)}
+            onClick={() => setModalDuplicar(true)}
             className="inline-flex items-center gap-1.5 text-sm text-[var(--texto-muted)] transition hover:text-[var(--texto)]"
           >
-            Alterar status
+            <Copy className="h-3.5 w-3.5" /> Duplicar
           </button>
 
-          {!faturado && travado && (
+          {!faturado && !consignado && travado && (
             <button
               type="button"
               onClick={() => setModalFaturar(true)}
               className="inline-flex items-center gap-1.5 text-sm font-medium text-sucesso transition hover:text-sucesso/80"
             >
               <Receipt className="h-3.5 w-3.5" /> Faturar
+            </button>
+          )}
+
+          {podeConsignar && (
+            <button
+              type="button"
+              onClick={() => consignar.mutate()}
+              disabled={consignar.isPending}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-secondary-600 transition hover:text-secondary-500 disabled:opacity-50"
+            >
+              <Handshake className="h-3.5 w-3.5" /> {consignar.isPending ? 'Consignando...' : 'Consignar'}
             </button>
           )}
 
@@ -584,29 +668,84 @@ export function PaginaDetalheOrcamento() {
               Remover faturamento
             </button>
           )}
+
+          {consignado && (
+            <>
+              {o.consignacaoId && (
+                <Link
+                  to={`/admin/consignacoes/${o.consignacaoId}`}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-secondary-600 transition hover:text-secondary-500"
+                >
+                  <Handshake className="h-3.5 w-3.5" /> Ver consignação
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={() => reverterConsignacao.mutate()}
+                disabled={reverterConsignacao.isPending}
+                className="inline-flex items-center gap-1.5 text-sm text-[var(--texto-muted)] transition hover:text-erro disabled:opacity-50"
+              >
+                Reverter consignação
+              </button>
+            </>
+          )}
         </div>
 
+        {erroConsignar && (
+          <p className="px-5 pt-1 text-sm text-erro">{erroConsignar}</p>
+        )}
+
         {/* Card financeiro */}
-        {tituloFinanceiro.data && (
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-[var(--borda)] bg-[var(--fundo)]/50 px-5 py-2.5">
-            <Receipt className="h-3.5 w-3.5 text-[var(--texto-muted)]" />
-            <span className="text-sm text-[var(--texto-muted)]">
-              Título financeiro:{' '}
-              <span
-                className="rounded-full px-2 py-0.5 text-xs font-medium"
-                style={{
-                  backgroundColor: `${corStatusTitulo(tituloFinanceiro.data.status)}22`,
-                  color: corStatusTitulo(tituloFinanceiro.data.status),
-                }}
-              >
-                {rotuloStatusTitulo(tituloFinanceiro.data.status)}
-              </span>
-              {' '}·{' '}
-              <strong>{formatarMoeda(tituloFinanceiro.data.valor)}</strong>
-              {' '}·{' '}
-              vence{' '}
-              {new Date(tituloFinanceiro.data.dataVencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
-            </span>
+        {(tituloReceita || titulosDespesa.length > 0) && (
+          <div className="space-y-2 border-t border-[var(--borda)] bg-[var(--fundo)]/50 px-5 py-2.5">
+            {tituloReceita && (
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <Receipt className="h-3.5 w-3.5 text-[var(--texto-muted)]" />
+                <span className="text-sm text-[var(--texto-muted)]">
+                  Contas a receber:{' '}
+                  <span
+                    className="rounded-full px-2 py-0.5 text-xs font-medium"
+                    style={{
+                      backgroundColor: `${corStatusTitulo(tituloReceita.status)}22`,
+                      color: corStatusTitulo(tituloReceita.status),
+                    }}
+                  >
+                    {rotuloStatusTitulo(tituloReceita.status)}
+                  </span>
+                  {' '}·{' '}
+                  <strong>{formatarMoeda(tituloReceita.valor)}</strong>
+                  {' '}·{' '}
+                  vence{' '}
+                  {new Date(tituloReceita.dataVencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
+                </span>
+              </div>
+            )}
+            {titulosDespesa.map((titulo) => (
+              <div key={titulo.id} className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <Receipt className="h-3.5 w-3.5 text-[var(--texto-muted)]" />
+                <span className="text-sm text-[var(--texto-muted)]">
+                  Contas a pagar
+                  {titulo.FinanceiroPlanoConta?.nome
+                    ? ` (${titulo.FinanceiroPlanoConta.nome})`
+                    : ' (frete)'}
+                  :{' '}
+                  <span
+                    className="rounded-full px-2 py-0.5 text-xs font-medium"
+                    style={{
+                      backgroundColor: `${corStatusTitulo(titulo.status)}22`,
+                      color: corStatusTitulo(titulo.status),
+                    }}
+                  >
+                    {rotuloStatusTitulo(titulo.status)}
+                  </span>
+                  {' '}·{' '}
+                  <strong>{formatarMoeda(titulo.valor)}</strong>
+                  {' '}·{' '}
+                  vence{' '}
+                  {new Date(titulo.dataVencimento + 'T12:00:00').toLocaleDateString('pt-BR')}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </Card>
@@ -712,6 +851,11 @@ export function PaginaDetalheOrcamento() {
                           <span className="rounded-full bg-[var(--superficie-elevada)] px-2 py-0.5 text-xs text-[var(--texto-muted)]">
                             {isAvulso ? 'Material' : 'Peça'}
                           </span>
+                          {item.ehFrete && (
+                            <span className="rounded-full bg-alerta/15 px-2 py-0.5 text-xs font-medium text-alerta">
+                              Frete
+                            </span>
+                          )}
                         </div>
                         {!isAvulso && (
                           <p className="text-xs text-[var(--texto-muted)]">
@@ -941,8 +1085,25 @@ export function PaginaDetalheOrcamento() {
         onFechar={() => setModalFaturar(false)}
         onSalvo={() => {
           qc.invalidateQueries({ queryKey: ['orcamento', id] })
-          qc.invalidateQueries({ queryKey: ['titulo-financeiro-orcamento', id] })
+          qc.invalidateQueries({ queryKey: ['titulos-financeiro-orcamento', id] })
+          qc.invalidateQueries({ queryKey: ['financeiro-titulos'] })
+          qc.invalidateQueries({ queryKey: ['fluxo-caixa'] })
         }}
+      />
+
+      <ModalDuplicarOrcamento
+        aberto={modalDuplicar}
+        orcamentoId={id ?? null}
+        clienteAtualId={o.clienteId}
+        itens={listaItens.map((i) => ({
+          id: i.id,
+          nomePeca: i.nomePeca,
+          precoFinal: Number(i.precoFinal),
+          precoTotal: Number(i.precoTotal),
+          tipoItem: i.tipoItem ?? 'peca',
+          ehFrete: i.ehFrete ?? false,
+        }))}
+        onFechar={() => setModalDuplicar(false)}
       />
 
       {/* Modal: pergunta se quer faturar ao finalizar */}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -15,15 +15,12 @@ import {
 export function PaginaMovimentacoes() {
   const qc = useQueryClient()
   const [params, setParams] = useSearchParams()
-  const [modalCriarAberto, setModalCriarAberto] = useState(false)
-  const [detalhe, setDetalhe] = useState<MovimentacaoDetalhe | null>(null)
-  const [abriuViaUrl, setAbriuViaUrl] = useState(false)
+  const [modalCriarManual, setModalCriarManual] = useState(false)
+  const [detalheManual, setDetalheManual] = useState<MovimentacaoDetalhe | null>(null)
   const materialIdUrl = params.get('materialId') ?? undefined
   const idUrl = params.get('id') ?? undefined
 
-  useEffect(() => {
-    if (materialIdUrl) setModalCriarAberto(true)
-  }, [materialIdUrl])
+  const modalCriarAberto = Boolean(materialIdUrl) || modalCriarManual
 
   const historico = useQuery({
     queryKey: ['movimentacoes'],
@@ -38,34 +35,28 @@ export function PaginaMovimentacoes() {
     },
   })
 
-  useEffect(() => {
-    if (!idUrl) return
+  const detalheNaLista = idUrl
+    ? (historico.data?.find((m) => m.id === idUrl) ?? null)
+    : null
 
-    if (historico.data) {
-      const mov = historico.data.find((m) => m.id === idUrl)
-      if (mov) {
-        setDetalhe(mov)
-        setAbriuViaUrl(true)
-        return
-      }
-    }
-
-    if (!supabase) return
-    let cancelado = false
-    void (async () => {
-      const { data } = await supabase
+  const detalhePorId = useQuery({
+    queryKey: ['movimentacao', idUrl],
+    enabled: Boolean(idUrl) && !detalheNaLista && Boolean(supabase),
+    queryFn: async () => {
+      if (!supabase || !idUrl) return null
+      const { data, error } = await supabase
         .from('EstoqueMovimentacao')
         .select('*, Material(nome, unidadeMedida), EstoqueTipoMovimentacao(nome, codigo)')
         .eq('id', idUrl)
         .maybeSingle()
-      if (cancelado || !data) return
-      setDetalhe(data as MovimentacaoDetalhe)
-      setAbriuViaUrl(true)
-    })()
-    return () => {
-      cancelado = true
-    }
-  }, [idUrl, historico.data])
+      if (error) throw error
+      return (data ?? null) as MovimentacaoDetalhe | null
+    },
+  })
+
+  const detalheViaUrl = detalheNaLista ?? detalhePorId.data ?? null
+  const detalhe = detalheViaUrl ?? detalheManual
+  const abriuViaUrl = Boolean(detalheViaUrl)
 
   const tabela = useOrdenacaoPaginacao(historico.data ?? [], 'criadoEm', 'desc')
 
@@ -77,13 +68,12 @@ export function PaginaMovimentacoes() {
   }
 
   const fecharDetalhe = () => {
-    setDetalhe(null)
-    setAbriuViaUrl(false)
+    setDetalheManual(null)
     limparParamId()
   }
 
   const fecharModalCriar = () => {
-    setModalCriarAberto(false)
+    setModalCriarManual(false)
     if (materialIdUrl) {
       const next = new URLSearchParams(params)
       next.delete('materialId')
@@ -100,15 +90,14 @@ export function PaginaMovimentacoes() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-[var(--texto)]">Movimentações de estoque</h2>
-        <Botao onClick={() => setModalCriarAberto(true)}>Nova movimentação</Botao>
+        <Botao onClick={() => setModalCriarManual(true)}>Nova movimentação</Botao>
       </div>
 
       <TabelaDados
         idTabela="movimentacoes-estoque"
         colunasPadraoMobile={['numeroSequencial', 'criadoEm', 'material', 'tipo', 'quantidade']}
         onLinhaClick={(m) => {
-          setAbriuViaUrl(false)
-          setDetalhe(m)
+          setDetalheManual(m)
         }}
         colunas={[
           {

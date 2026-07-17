@@ -120,6 +120,8 @@ export interface Database {
         configuracaoImpressoraId: string | null
         travado: boolean
         faturado: boolean
+        consignado: boolean
+        consignacaoId: string | null
         validoAte: string | null
         prazoEntrega: string | null
         origem: string
@@ -164,6 +166,7 @@ export interface Database {
         descricao: string
         clienteId: string | null
         orcamentoId: string | null
+        consignacaoId: string | null
         movimentacaoEstoqueId: string | null
         fornecedor: string | null
         observacoes: string | null
@@ -235,6 +238,7 @@ export interface Database {
         orcamentoId: string
         tipoItem: string
         aplicarMargem: boolean
+        ehFrete: boolean
         nomePeca: string
         tempoHoras: number
         tempoMinutos: number
@@ -329,6 +333,44 @@ export interface Database {
         pesoG: number | null
         ordem: number
       }>
+      Consignacao: Tabela<{
+        id: string
+        numeroSequencial: number
+        clienteId: string
+        status: 'aberta' | 'encerrada'
+        observacoes: string | null
+        abertaEm: string
+        encerradaEm: string | null
+        criadoEm: string
+        atualizadoEm: string
+        criadoPor: string | null
+        atualizadoPor: string | null
+      }>
+      ConsignacaoItem: Tabela<{
+        id: string
+        consignacaoId: string
+        orcamentoId: string | null
+        orcamentoItemId: string | null
+        descricao: string
+        quantidade: number
+        precoUnitario: number
+        valorTotal: number
+        vendido: boolean
+        consignadoEm: string
+        criadoEm: string
+        criadoPor: string | null
+      }>
+      ConsignacaoRecebimento: Tabela<{
+        id: string
+        consignacaoId: string
+        valor: number
+        dataRecebimento: string
+        contaCaixaId: string
+        financeiroTituloId: string | null
+        observacoes: string | null
+        criadoEm: string
+        criadoPor: string | null
+      }>
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -361,3 +403,6 @@ export type FinanceiroContaCaixa = Database['public']['Tables']['FinanceiroConta
 export type FinanceiroTitulo = Database['public']['Tables']['FinanceiroTitulo']['Row']
 export type FinanceiroBaixa = Database['public']['Tables']['FinanceiroBaixa']['Row']
 export type FinanceiroLogOperacao = Database['public']['Tables']['FinanceiroLogOperacao']['Row']
+export type Consignacao = Database['public']['Tables']['Consignacao']['Row']
+export type ConsignacaoItem = Database['public']['Tables']['ConsignacaoItem']['Row']
+export type ConsignacaoRecebimento = Database['public']['Tables']['ConsignacaoRecebimento']['Row']

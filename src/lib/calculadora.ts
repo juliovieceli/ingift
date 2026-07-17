@@ -68,6 +68,7 @@ export interface AvulsoCalculo {
   custoUnitario: number
   materialId?: string
   aplicarMargem: boolean
+  ehFrete?: boolean
   observacoes?: string
 }
 
@@ -379,6 +380,7 @@ export function avulsoVazio(): AvulsoCalculo {
     quantidade: 1,
     custoUnitario: 0,
     aplicarMargem: true,
+    ehFrete: false,
     observacoes: '',
   }
 }

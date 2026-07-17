@@ -22,6 +22,10 @@ export function corStatusTitulo(status: FinanceiroTitulo['status']): string {
 // ── Códigos default do seed ────────────────────────────────────────────────
 export const CODIGO_DEFAULT_RECEITA = 'receita_vendas'
 export const CODIGO_DEFAULT_DESPESA = 'despesa_materia_prima'
+export const CODIGO_FRETE_CLIENTE = 'despesa_frete_cliente'
+export const CODIGO_FRETE_EMPRESA = 'despesa_frete_empresa'
+
+export type FreteResponsavel = 'cliente' | 'empresa'
 
 export async function buscarPlanoContaIdPorCodigo(
   supabase: SupabaseClient,
@@ -39,13 +43,20 @@ export async function buscarPlanoContaIdPorCodigo(
 
 export async function faturarOrcamento(
   supabase: SupabaseClient,
-  params: { orcamentoId: string; planoContaId: string; vencimento: string; descricao?: string },
+  params: {
+    orcamentoId: string
+    planoContaId: string
+    vencimento: string
+    descricao?: string
+    freteResponsavel?: FreteResponsavel | null
+  },
 ): Promise<string> {
   const { data, error } = await supabase.rpc('faturarOrcamento', {
-    p_orcamentoid:  params.orcamentoId,
+    p_orcamentoid: params.orcamentoId,
     p_planocontaid: params.planoContaId,
-    p_vencimento:   params.vencimento,
-    p_descricao:    params.descricao ?? null,
+    p_vencimento: params.vencimento,
+    p_descricao: params.descricao ?? null,
+    p_freteresponsavel: params.freteResponsavel ?? null,
   })
   if (error) throw new Error(error.message)
   return data as string
@@ -129,14 +140,32 @@ export async function buscarFluxoCaixaMensal(
 
 // ── Consultas de suporte ────────────────────────────────────────────────────
 
+export type TituloComPlano = FinanceiroTitulo & {
+  FinanceiroPlanoConta?: Pick<FinanceiroPlanoConta, 'nome' | 'codigo'>
+}
+
+export async function buscarTitulosDoOrcamento(
+  supabase: SupabaseClient,
+  orcamentoId: string,
+): Promise<TituloComPlano[]> {
+  const { data } = await supabase
+    .from('FinanceiroTitulo')
+    .select('*, FinanceiroPlanoConta(nome, codigo)')
+    .eq('orcamentoId', orcamentoId)
+    .order('criadoEm', { ascending: true })
+  return (data ?? []) as TituloComPlano[]
+}
+
+/** Receita vinculada ao orçamento (contas a receber). */
 export async function buscarTituloDoOrcamento(
   supabase: SupabaseClient,
   orcamentoId: string,
-): Promise<(FinanceiroTitulo & { FinanceiroPlanoConta?: Pick<FinanceiroPlanoConta, 'nome'> }) | null> {
+): Promise<TituloComPlano | null> {
   const { data } = await supabase
     .from('FinanceiroTitulo')
-    .select('*, FinanceiroPlanoConta(nome)')
+    .select('*, FinanceiroPlanoConta(nome, codigo)')
     .eq('orcamentoId', orcamentoId)
+    .eq('tipo', 'receita')
     .maybeSingle()
   return data ?? null
 }

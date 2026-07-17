@@ -135,6 +135,7 @@ export function itemParaAvulso(item: OrcamentoItemComComposicao): AvulsoCalculo 
     custoUnitario: Number(item.custoUnitario) || (qtd > 0 ? Number(item.custoMaterial) / qtd : 0),
     materialId: item.materialId ?? undefined,
     aplicarMargem: item.aplicarMargem ?? true,
+    ehFrete: item.ehFrete ?? false,
     observacoes: item.observacoes ?? '',
   }
 }
@@ -220,6 +221,7 @@ function rowItemAvulso(
     orcamentoId,
     tipoItem: 'avulso',
     aplicarMargem: avulso.aplicarMargem,
+    ehFrete: avulso.ehFrete ?? false,
     nomePeca: avulso.nome,
     tempoHoras: 0,
     tempoMinutos: 0,
@@ -352,6 +354,67 @@ export async function atualizarItemAvulso(
   if (errItem) throw errItem
 
   await recalcularTotaisOrcamento(supabase, orcamentoId)
+}
+
+/**
+ * Duplica um orçamento criando um novo (status em_digitacao) para o cliente
+ * informado, copiando apenas os itens selecionados (com sua composição) e
+ * preservando os valores/snapshots originais. Não copia vínculos de
+ * faturamento/consignação nem idExterno.
+ */
+export async function duplicarOrcamento(
+  supabase: SupabaseClient,
+  params: { orcamentoOrigemId: string; clienteId: string; itemIds: string[] },
+): Promise<string> {
+  if (params.itemIds.length === 0) throw new Error('Selecione ao menos um item para duplicar')
+
+  const { data: origem } = await supabase
+    .from('Orcamento')
+    .select('configuracaoImpressoraId')
+    .eq('id', params.orcamentoOrigemId)
+    .single()
+
+  const { data: itens, error: errItens } = await supabase
+    .from('OrcamentoItem')
+    .select('*, OrcamentoItemComposicao(*)')
+    .in('id', params.itemIds)
+    .order('ordem')
+  if (errItens) throw errItens
+
+  const novoId = await criarOrcamentoVazio(supabase, params.clienteId, {
+    configuracaoImpressoraId: origem?.configuracaoImpressoraId ?? null,
+  })
+
+  let ordem = 0
+  for (const item of (itens ?? []) as OrcamentoItemComComposicao[]) {
+    const composicao = item.OrcamentoItemComposicao ?? []
+    const camposItem: Record<string, unknown> = { ...item }
+    delete camposItem.id
+    delete camposItem.orcamentoId
+    delete camposItem.criadoEm
+    delete camposItem.idExterno
+    delete camposItem.OrcamentoItemComposicao
+
+    const { data: novoItem, error: errItem } = await supabase
+      .from('OrcamentoItem')
+      .insert({ ...camposItem, orcamentoId: novoId, idExterno: null, ordem: ordem++ })
+      .select('id')
+      .single()
+    if (errItem || !novoItem) throw errItem ?? new Error('Falha ao duplicar item')
+
+    for (const c of composicao) {
+      const camposComp: Record<string, unknown> = { ...c }
+      delete camposComp.id
+      delete camposComp.itemOrcamentoId
+      const { error: errComp } = await supabase
+        .from('OrcamentoItemComposicao')
+        .insert({ ...camposComp, itemOrcamentoId: novoItem.id })
+      if (errComp) throw errComp
+    }
+  }
+
+  await recalcularTotaisOrcamento(supabase, novoId)
+  return novoId
 }
 
 export async function criarOrcamentoVazio(

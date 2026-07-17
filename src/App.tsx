@@ -47,6 +47,12 @@ const PaginaCms = lazy(() =>
 const PaginaFinanceiro = lazy(() =>
   import('@/funcionalidades/admin/PaginaFinanceiro').then((m) => ({ default: m.PaginaFinanceiro }))
 )
+const PaginaConsignacoes = lazy(() =>
+  import('@/funcionalidades/admin/PaginaConsignacoes').then((m) => ({ default: m.PaginaConsignacoes }))
+)
+const PaginaDetalheConsignacao = lazy(() =>
+  import('@/funcionalidades/admin/PaginaDetalheConsignacao').then((m) => ({ default: m.PaginaDetalheConsignacao }))
+)
 
 const qc = new QueryClient()
 
@@ -95,6 +101,8 @@ export default function App() {
               <Route path="orcamentos" element={<Suspense fallback={<Carregando />}><PaginaOrcamentos /></Suspense>} />
               <Route path="orcamentos/modelos" element={<Suspense fallback={<Carregando />}><PaginaModelosPeca /></Suspense>} />
               <Route path="orcamentos/:id" element={<Suspense fallback={<Carregando />}><PaginaDetalheOrcamento /></Suspense>} />
+              <Route path="consignacoes" element={<Suspense fallback={<Carregando />}><PaginaConsignacoes /></Suspense>} />
+              <Route path="consignacoes/:id" element={<Suspense fallback={<Carregando />}><PaginaDetalheConsignacao /></Suspense>} />
               <Route path="cms" element={<Suspense fallback={<Carregando />}><PaginaCms /></Suspense>} />
               <Route path="estoque" element={<Suspense fallback={<Carregando />}><PaginaEstoque /></Suspense>} />
               <Route path="movimentacoes" element={<Suspense fallback={<Carregando />}><PaginaMovimentacoes /></Suspense>} />

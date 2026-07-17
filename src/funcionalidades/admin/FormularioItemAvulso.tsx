@@ -79,6 +79,12 @@ export function FormularioItemAvulso({ avulso, onChange, materiais = [] }: Props
         onChange={(checked) => onChange({ ...avulso, aplicarMargem: checked })}
       />
 
+      <Checkbox
+        rotulo="É frete (gera contas a pagar no faturamento)"
+        checked={avulso.ehFrete ?? false}
+        onChange={(checked) => onChange({ ...avulso, ehFrete: checked })}
+      />
+
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-[var(--texto-secundario)]">Observações</span>
         <textarea
